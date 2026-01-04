@@ -1,0 +1,28 @@
+# python trash
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# virtual environments trash
+.venv/
+venv/
+env/
+
+# editor / OS junk
+.vscode/
+.idea/
+.DS_Store
+
+# logs
+*.log
+
+# project specific ignores
+data/raw/*
+data/processed/*
+data/raw/.gitkeep
+data/processed/.gitkeep
+data/scripts/*.mp4
+data/scripts/debug_outputs/
+
+
