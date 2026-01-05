@@ -14,6 +14,52 @@ GREEN  = "\033[32m"
 RESET  = "\033[00m"
 start_time = time.time()
 
+## Specific function to get biggest bbox (to properly set params)
+def get_max_bbox(xml_path):
+    """
+    Goes through the entire PETS09 XML file and finds
+    the maximum width and height of bounding boxes along with the frame ID.
+    """
+    tree = ET.parse(xml_path)
+    root = tree.getroot()
+
+    max_w, max_h = 0, 0
+    max_frame = None
+
+    total_w, total_h = 0, 0
+    count = 0
+
+    for frame_node in root.iter("frame"):
+        frame_id = int(frame_node.attrib["number"])
+        objectlist = frame_node.find("objectlist")
+        if objectlist is None:
+            continue
+
+        for obj in objectlist.findall("object"):
+            box = obj.find("box")
+            if box is None:
+                continue
+
+            w = float(box.attrib["w"])
+            h = float(box.attrib["h"])
+
+            if w * h > max_w * max_h:
+                max_w = w
+                max_h = h
+                max_frame = frame_id
+
+            # for avg
+            total_w += w
+            total_h += h
+            count += 1
+
+    avg_w = total_w / count if count > 0 else 0
+    avg_h = total_h / count if count > 0 else 0
+
+    print(f"Max bbox width: {max_w:.2f}, height: {max_h:.2f}, average: {avg_w:.2f} x {avg_h:.2f} in frame: {max_frame}")
+    return max_w, max_h, max_frame
+
+
 ## PETS09 specific functions
 def load_past_traj(xml_path):
     tree = ET.parse(xml_path)
@@ -174,10 +220,6 @@ def rasterize_future_traj(traj, frame_id, future_steps, height, width, method):
     heatmap = (heatmap * 255).astype(np.uint8)
 
     return heatmap
-
-
-
-
 def get_bbox(xml_path, frame_id, pid):
     tree = ET.parse(xml_path)
     root = tree.getroot()
@@ -204,17 +246,22 @@ def get_bbox(xml_path, frame_id, pid):
                 return xc, yc, w, h
 
     return None
-def bbox_crop(img, xc, yc, bw, bh, pad_w, pad_h):
+def bbox_crop(img, xc, yc, bw, bh, offsets):
     """
     Crop image using bounding box + padding.
     Pads with zeros if out of bounds.
     """
     H, W = img.shape[:2]
+    left, right, top, bottom = offsets
 
-    x1 = int(round(xc - bw / 2 - pad_w))
-    y1 = int(round(yc - bh / 2 - pad_h))
-    x2 = int(round(xc + bw / 2 + pad_w))
-    y2 = int(round(yc + bh / 2 + pad_h))
+    # Anchor point
+    ax = xc
+    ay = yc + bh / 2.0
+
+    x1 = int(round(ax - left))
+    y1 = int(round(ay - top))
+    x2 = int(round(ax + right))
+    y2 = int(round(ay + bottom))
 
     crop_w = x2 - x1
     crop_h = y2 - y1
@@ -236,7 +283,9 @@ def bbox_crop(img, xc, yc, bw, bh, pad_w, pad_h):
     return crop
 
 
-
+# if __name__ == "__main__":
+    # xml_path = Path("../raw/PETS09/labels/annotations/PETS2009-S2L1.xml")
+    # max_w, max_h, max_frame = get_max_bbox(xml_path)
 
 if __name__ == "__main__":
     INPUT_CFG, GT_CFG = load_params("utils/params.yaml")
@@ -247,9 +296,9 @@ if __name__ == "__main__":
 
     # --- config ---
     past_steps              = INPUT_CFG["past_traj_steps"]
-    crop_w, crop_h          = INPUT_CFG["crop_size"]
-    ctx_w, ctx_h            = INPUT_CFG["context_size"]
-    mask_pad_w, mask_pad_h  = INPUT_CFG["obstacle_mask_size"]
+    local_crop_offset       = INPUT_CFG["crop_size"]
+    ctx_offset              = INPUT_CFG["context_size"]
+    mask_offset             = INPUT_CFG["obstacle_mask_size"]
     traj_method             = INPUT_CFG["traj_sampling_method"]
     # ================================
     future_steps            = GT_CFG["future_traj_steps"]
@@ -259,7 +308,7 @@ if __name__ == "__main__":
     frame_ids = sorted([
         int(p.stem.split("_")[1])
         # for p in frames_dir.glob("frame_*.jpg")
-        for p in frames_dir.glob("frame_0020.jpg") # DEBUG
+        for p in frames_dir.glob("frame_0528.jpg") # DEBUG
     ])
 
 
@@ -279,11 +328,12 @@ if __name__ == "__main__":
         # ==========================================================
         # OUTPUT CONTAINERS (this is what glue() will later consume)
         # ==========================================================
-        traj_rasters   = {}    # pid -> (H, W) uint8
-        local_crops    = {}    # pid -> (h, w, 3)
-        context_crops  = {}    # pid -> (hc, wc, 3)
-        obstacle_crops = {}    # pid -> (hm, wm) uint8
-        future_heatmaps = {}  # pid -> (H, W) float32
+        traj_rasters    = {}    # pid -> (H, W) uint8
+        local_crops     = {}    # pid -> (h, w, 3)
+        context_crops   = {}    # pid -> (hc, wc, 3)
+        obstacle_crops  = {}    # pid -> (hm, wm) uint8
+        future_heatmaps = {}    # pid -> (H, W) float32
+        anchors         = {}    # pid -> (x, y) in full frame coordinates
 
         # ==========================================================
         # MAIN LOOP
@@ -314,13 +364,9 @@ if __name__ == "__main__":
 
             xc, yc, bw, bh = bbox
 
-            # --- crops ---
-            pad_w, pad_h = crop_w, crop_h
-            ctx_pad_w, ctx_pad_h = ctx_w, ctx_h
-
-            local_rgb   = bbox_crop(img, xc, yc, bw, bh, pad_w=pad_w, pad_h=pad_h)
-            context_rgb = bbox_crop(img, xc, yc, bw, bh, pad_w=ctx_pad_w, pad_h=ctx_pad_h)
-            mask_crop   = bbox_crop(obstacle_mask, xc, yc, bw, bh, pad_w=mask_pad_w, pad_h=mask_pad_h)
+            local_rgb   = bbox_crop(img, xc, yc, bw, bh, local_crop_offset)
+            context_rgb = bbox_crop(img, xc, yc, bw, bh, ctx_offset)
+            mask_crop   = bbox_crop(obstacle_mask, xc, yc, bw, bh, mask_offset)
 
             # --- future trajectory heatmap ---
             heatmap = rasterize_future_traj(
@@ -339,6 +385,7 @@ if __name__ == "__main__":
             context_crops[pid]   = context_rgb
             obstacle_crops[pid]  = mask_crop
             future_heatmaps[pid] = heatmap
+            anchors[pid]         = (xc, yc + bh / 2.0)
 
 
         # ==========================================================
@@ -353,6 +400,7 @@ if __name__ == "__main__":
                 local_rgb     = local_crops[pid],
                 context_rgb   = context_crops[pid],
                 obstacle_mask = obstacle_crops[pid],
+                anchor_xy     = anchors[pid],
                 save_path     = save_file
             )
 
@@ -372,11 +420,8 @@ if __name__ == "__main__":
     print(f"{GREEN}[INFO]{RESET} ✅ Dataset processing done, outputs saved to: {save_file.parent}/*.npy")
 
 
-
-    """
-    3. veci ostavaju:
-        ✅ 1. implement unglue() ✅
-        ✅ 2. pre vsetky obrazky ✅
-        ✅ 3. tqdm ✅
-        4. .gitignore and git 
-    """
+"""
+# TODO:
+    1. prepisat veci nech nie su + od boundig boxu ale od stredu spodnej ciary bboxu
+    2. pridat x,y do glue nech potom vieme dat modelu vediet kde je clovek v ramci celeho obrazu
+"""

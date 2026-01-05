@@ -1,7 +1,11 @@
 for_input:
-  crop_size: [30, 30]                 # [width, height] of local crops around detections
-  context_size: [100, 50]             # [width, height] of context crops around detections
-  obstacle_mask_size: [200, 100]      # [width, height] of not walkable area mask
+  # offsets from anchor point (middle of bottom line of bounding box) 
+  # crop_size: [left, right, top, bottom]  
+  # context_size: [left, right, top, bottom]
+  # obstacle_mask_size: [left, right, top, bottom]
+  crop_size: [40, 40, 110, 10]  
+  context_size: [80, 80, 160, 20]
+  obstacle_mask_size: [150, 150, 210, 50]
   traj_sampling_method: "linear"      # method for trajectory generation (linear / gaussian)
   past_traj_steps: 10                 # number of past positions for trajectory encoding
 
