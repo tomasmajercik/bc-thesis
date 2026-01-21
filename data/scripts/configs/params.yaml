@@ -6,4 +6,4 @@ for_input:
 
 for_groundtruth:
   future_traj_steps: 15               # number of future positions to predict
-  traj_sampling_method: "gaussian"      # method for trajectory generation (linear / gaussian)
+  traj_sampling_method: "gaussian"    # method for trajectory generation (linear / gaussian)

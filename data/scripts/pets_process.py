@@ -14,52 +14,6 @@ GREEN  = "\033[32m"
 RESET  = "\033[00m"
 start_time = time.time()
 
-## Specific function to get biggest bbox (to properly set params)
-def get_max_bbox(xml_path):
-    """
-    Goes through the entire PETS09 XML file and finds
-    the maximum width and height of bounding boxes along with the frame ID.
-    """
-    tree = ET.parse(xml_path)
-    root = tree.getroot()
-
-    max_w, max_h = 0, 0
-    max_frame = None
-
-    total_w, total_h = 0, 0
-    count = 0
-
-    for frame_node in root.iter("frame"):
-        frame_id = int(frame_node.attrib["number"])
-        objectlist = frame_node.find("objectlist")
-        if objectlist is None:
-            continue
-
-        for obj in objectlist.findall("object"):
-            box = obj.find("box")
-            if box is None:
-                continue
-
-            w = float(box.attrib["w"])
-            h = float(box.attrib["h"])
-
-            if w * h > max_w * max_h:
-                max_w = w
-                max_h = h
-                max_frame = frame_id
-
-            # for avg
-            total_w += w
-            total_h += h
-            count += 1
-
-    avg_w = total_w / count if count > 0 else 0
-    avg_h = total_h / count if count > 0 else 0
-
-    print(f"Max bbox width: {max_w:.2f}, height: {max_h:.2f}, average: {avg_w:.2f} x {avg_h:.2f} in frame: {max_frame}")
-    return max_w, max_h, max_frame
-
-
 ## PETS09 specific functions
 def load_past_traj(xml_path):
     tree = ET.parse(xml_path)
@@ -263,31 +217,31 @@ def zoom_n_crop(frame, anchor_point, scale):
     crop_w = W / scale
     crop_h = H / scale
 
-    # Calculate top-left corner of cropping box
-    x1 = int(round(ax * (1 - 1/scale)))
-    y1 = int(round(ay * (1 - 1/scale)))
-    x2 = int(round(x1 + crop_w))
-    y2 = int(round(y1 + crop_h))
+    # Anchor point ratio in original image
+    ratio_x = ax / W
+    ratio_y = ay / H
 
-    # Ensure cropping box is within image bounds
+    # Top-left corner of crop to maintain anchor at same ratio
+    x1 = ax - crop_w * ratio_x
+    y1 = ay - crop_h * ratio_y
+
+    x2 = x1 + crop_w
+    y2 = y1 + crop_h
+
+    # Round and clamp
+    x1, y1 = int(round(x1)), int(round(y1))
+    x2, y2 = int(round(x2)), int(round(y2))
+
+    x1 = max(0, x1)
+    y1 = max(0, y1)
     x2 = min(x2, W)
     y2 = min(y2, H)
 
     cropped_part = frame[y1:y2, x1:x2]
-
-    # Resize back to original size (keep anchor in place)
     return cv2.resize(cropped_part, (W, H), interpolation=cv2.INTER_LINEAR)
 
-
-
-
-
-# if __name__ == "__main__":
-    # xml_path = Path("../raw/PETS09/labels/annotations/PETS2009-S2L1.xml")
-    # max_w, max_h, max_frame = get_max_bbox(xml_path)
-
 if __name__ == "__main__":
-    INPUT_CFG, GT_CFG = load_params("utils/params.yaml")
+    INPUT_CFG, GT_CFG = load_params("configs/params.yaml")
 
     frames_dir  = Path("../raw/PETS09/frames")
     xml_path    = Path("../raw/PETS09/labels/annotations/PETS2009-S2L1.xml")
@@ -331,7 +285,6 @@ if __name__ == "__main__":
         local_crops     = {}    # pid -> (h, w, 3)
         context_crops   = {}    # pid -> (hc, wc, 3)
         future_heatmaps = {}    # pid -> (H, W) float32
-        anchors         = {}    # pid -> (x, y) in full frame coordinates
 
         # ==========================================================
         # MAIN LOOP
@@ -363,9 +316,6 @@ if __name__ == "__main__":
             anchor_point = get_anchor(bbox)
             local_rgb    = zoom_n_crop(img, anchor_point, local_scale)
             context_rgb  = zoom_n_crop(img, anchor_point, context_scale)
-
-            # local_rgb   = bbox_crop(img, xc, yc, bw, bh, local_crop_offset)
-            # context_rgb = bbox_crop(img, xc, yc, bw, bh, ctx_offset)
 
             # --- future trajectory heatmap ---
             heatmap = rasterize_future_traj(
