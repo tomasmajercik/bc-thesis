@@ -105,6 +105,7 @@ def get_people_in_frame(xml_path, frame_id):
             return [int(obj.attrib["id"]) for obj in objectlist.findall("object")]
 
     return []
+
 def rasterize_past_traj(
     traj,
     frame_id,
@@ -246,41 +247,39 @@ def get_bbox(xml_path, frame_id, pid):
                 return xc, yc, w, h
 
     return None
-def bbox_crop(img, xc, yc, bw, bh, offsets):
+def get_anchor(bbox):
+    xc, yc, w, h = bbox
+    anchor_x = xc
+    anchor_y = yc + h / 2.0 # bottom center of bbox
+    return (anchor_x, anchor_y) 
+def zoom_n_crop(frame, anchor_point, scale):
     """
-    Crop image using bounding box + padding.
-    Pads with zeros if out of bounds.
+    Zoom into image with respect to anchor point (anchor point stays on the same position). 
     """
-    H, W = img.shape[:2]
-    left, right, top, bottom = offsets
+    H, W = frame.shape[:2]
+    ax, ay = anchor_point
 
-    # Anchor point
-    ax = xc
-    ay = yc + bh / 2.0
+    # Calculate cropping box size
+    crop_w = W / scale
+    crop_h = H / scale
 
-    x1 = int(round(ax - left))
-    y1 = int(round(ay - top))
-    x2 = int(round(ax + right))
-    y2 = int(round(ay + bottom))
+    # Calculate top-left corner of cropping box
+    x1 = int(round(ax * (1 - 1/scale)))
+    y1 = int(round(ay * (1 - 1/scale)))
+    x2 = int(round(x1 + crop_w))
+    y2 = int(round(y1 + crop_h))
 
-    crop_w = x2 - x1
-    crop_h = y2 - y1
+    # Ensure cropping box is within image bounds
+    x2 = min(x2, W)
+    y2 = min(y2, H)
 
-    crop = np.zeros((crop_h, crop_w, *img.shape[2:]), dtype=img.dtype)
+    cropped_part = frame[y1:y2, x1:x2]
 
-    src_x1 = max(0, x1)
-    src_y1 = max(0, y1)
-    src_x2 = min(W, x2)
-    src_y2 = min(H, y2)
+    # Resize back to original size (keep anchor in place)
+    return cv2.resize(cropped_part, (W, H), interpolation=cv2.INTER_LINEAR)
 
-    dst_x1 = src_x1 - x1
-    dst_y1 = src_y1 - y1
-    dst_x2 = dst_x1 + (src_x2 - src_x1)
-    dst_y2 = dst_y1 + (src_y2 - src_y1)
 
-    crop[dst_y1:dst_y2, dst_x1:dst_x2] = img[src_y1:src_y2, src_x1:src_x2]
 
-    return crop
 
 
 # if __name__ == "__main__":
@@ -296,18 +295,18 @@ if __name__ == "__main__":
 
     # --- config ---
     past_steps              = INPUT_CFG["past_traj_steps"]
-    local_crop_offset       = INPUT_CFG["crop_size"]
-    ctx_offset              = INPUT_CFG["context_size"]
-    mask_offset             = INPUT_CFG["obstacle_mask_size"]
+    local_scale             = INPUT_CFG["local_scale"]
+    context_scale           = INPUT_CFG["context_scale"]
     traj_method             = INPUT_CFG["traj_sampling_method"]
     # ================================
     future_steps            = GT_CFG["future_traj_steps"]
     gt_traj_method          = GT_CFG["traj_sampling_method"]
+    
     # ================================
     iterator = 0
     frame_ids = sorted([
         int(p.stem.split("_")[1])
-        # for p in frames_dir.glob("frame_*.jpg")
+        # for p in frames_dir.glob("frame_*.jpg") # full run
         for p in frames_dir.glob("frame_0528.jpg") # DEBUG
     ])
 
@@ -331,7 +330,6 @@ if __name__ == "__main__":
         traj_rasters    = {}    # pid -> (H, W) uint8
         local_crops     = {}    # pid -> (h, w, 3)
         context_crops   = {}    # pid -> (hc, wc, 3)
-        obstacle_crops  = {}    # pid -> (hm, wm) uint8
         future_heatmaps = {}    # pid -> (H, W) float32
         anchors         = {}    # pid -> (x, y) in full frame coordinates
 
@@ -353,20 +351,21 @@ if __name__ == "__main__":
             )
 
             if raster is None:
-                print(f"{ORANGE}[Warn]{RESET}pid {pid}: skipped (not enough past)")
+                print(f"{ORANGE}[Info]{RESET} pid {pid}: skipped (not enough past)")
                 continue
 
             # --- bounding box (for crop center) ---
             bbox = get_bbox(xml_path, frame_id, pid)
             if bbox is None:
-                print(f"{ORANGE}[Warn]{RESET}pid {pid}: missing bbox")
+                print(f"{ORANGE}[Warn]{RESET} pid {pid}: missing bbox")
                 continue
 
-            xc, yc, bw, bh = bbox
+            anchor_point = get_anchor(bbox)
+            local_rgb    = zoom_n_crop(img, anchor_point, local_scale)
+            context_rgb  = zoom_n_crop(img, anchor_point, context_scale)
 
-            local_rgb   = bbox_crop(img, xc, yc, bw, bh, local_crop_offset)
-            context_rgb = bbox_crop(img, xc, yc, bw, bh, ctx_offset)
-            mask_crop   = bbox_crop(obstacle_mask, xc, yc, bw, bh, mask_offset)
+            # local_rgb   = bbox_crop(img, xc, yc, bw, bh, local_crop_offset)
+            # context_rgb = bbox_crop(img, xc, yc, bw, bh, ctx_offset)
 
             # --- future trajectory heatmap ---
             heatmap = rasterize_future_traj(
@@ -378,15 +377,11 @@ if __name__ == "__main__":
                 method=gt_traj_method
             )
 
-
             # --- store ---
             traj_rasters[pid]    = raster
             local_crops[pid]     = local_rgb
             context_crops[pid]   = context_rgb
-            obstacle_crops[pid]  = mask_crop
             future_heatmaps[pid] = heatmap
-            anchors[pid]         = (xc, yc + bh / 2.0)
-
 
         # ==========================================================
         # Glue all together and save to a ndarray
@@ -399,8 +394,6 @@ if __name__ == "__main__":
                 traj_raster   = traj_rasters[pid],
                 local_rgb     = local_crops[pid],
                 context_rgb   = context_crops[pid],
-                obstacle_mask = obstacle_crops[pid],
-                anchor_xy     = anchors[pid],
                 save_path     = save_file
             )
 
@@ -408,20 +401,9 @@ if __name__ == "__main__":
             np.save(gt_file, future_heatmaps[pid])
 
             iterator += 1
+    
+    obstacle_mask_file = Path("../processed/PETS09/obstacle_mask.npy")
+    np.save(obstacle_mask_file, obstacle_mask)
 
-
-    import warnings
-    warnings.warn(
-        f"\n{ORANGE}[Warn]{RESET}Using allow_pickle=True, maybe you want to change that later "
-        "to pad the images? Now it is wrapped in an object array",
-        UserWarning
-    )
     print(f"{GREEN}[INFO]{RESET} 👉 Process completed in {(time.time() - start_time):.2f}s")
     print(f"{GREEN}[INFO]{RESET} ✅ Dataset processing done, outputs saved to: {save_file.parent}/*.npy")
-
-
-"""
-# TODO:
-    1. prepisat veci nech nie su + od boundig boxu ale od stredu spodnej ciary bboxu
-    2. pridat x,y do glue nech potom vieme dat modelu vediet kde je clovek v ramci celeho obrazu
-"""

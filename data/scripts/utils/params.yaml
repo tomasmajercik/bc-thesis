@@ -1,11 +1,6 @@
 for_input:
-  # offsets from anchor point (middle of bottom line of bounding box) 
-  # crop_size: [left, right, top, bottom]  
-  # context_size: [left, right, top, bottom]
-  # obstacle_mask_size: [left, right, top, bottom]
-  crop_size: [40, 40, 110, 10]  
-  context_size: [80, 80, 160, 20]
-  obstacle_mask_size: [150, 150, 210, 50]
+  local_scale: 3.0                    # scale for local crop around the person
+  context_scale: 1.0                  # scale for context crop around the person
   traj_sampling_method: "linear"      # method for trajectory generation (linear / gaussian)
   past_traj_steps: 10                 # number of past positions for trajectory encoding
 

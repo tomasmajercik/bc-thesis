@@ -15,7 +15,7 @@ def load_params(path="params.yaml"):
     print("✅ Parameter configuration loaded")
     return INPUT_CFG, GT_CFG
 
-def glue(traj_raster, local_rgb, context_rgb, obstacle_mask, anchor_xy, save_path):
+def glue(traj_raster, local_rgb, context_rgb, save_path):
     """
     Merge the four inputs into one numpy array along the channels and save.
 
@@ -23,94 +23,87 @@ def glue(traj_raster, local_rgb, context_rgb, obstacle_mask, anchor_xy, save_pat
         traj_raster   : (H, W) uint8
         local_rgb     : (h, w, 3) uint8
         context_rgb   : (hc, wc, 3) uint8
-        obstacle_mask : (hm, wm) uint8
-        anchor_xy     : (2,) float
 
     Output:
-        saves merged array as .npy at save_path
+        channels 0-2   : local_rgb
+        channels 3-5   : context_rgb
+        channels 6     : traj_raster
     """
 
-     # --- ensure arrays are in uint8 ---
-    traj_raster   = np.expand_dims(traj_raster, axis=-1)       # H,W -> H,W,1
-    obstacle_mask = np.expand_dims(obstacle_mask, axis=-1)     # hm,wm -> hm,wm,1
+    # must be 3D for concatenation
+    if traj_raster.ndim == 2:
+        traj_raster = np.expand_dims(traj_raster, axis=-1)
 
-    # --- stack channels ---
-    # merged = np.array([traj_raster, local_rgb, context_rgb, obstacle_mask], dtype=object)
-    data = {
-        "traj_raster": traj_raster,
-        "local_rgb": local_rgb,
-        "context_rgb": context_rgb,
-        "obstacle_mask": obstacle_mask,
-        "anchor_xy": np.array(anchor_xy, dtype=np.float32)
-    }
+    merged = np.concatenate([
+        local_rgb, 
+        context_rgb, 
+        traj_raster
+    ], axis=-1).astype(np.uint8)
 
     # --- save ---
     save_path = Path(save_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)
-    np.save(save_path, data, allow_pickle=True)
+    np.save(save_path, merged)
 
 def unglue(original_frame_id, processed_id):
     """
-    Save individual visualizations for a frame and processed ndarray.
-    
-    Outputs 5 separate images:
-        - original frame with anchor
-        - obstacle mask
-        - local crop
-        - context crop
-        - past trajectory
-        - future heatmap
+    Unglue the processed 7-channel ndarray and save separate visualizations.
+    - channels 0-2: local_rgb
+    - channels 3-5: context_rgb
+    - channel 6: past_trajectory
     """
+    # Define paths
     base_path = Path(__file__).parent.parent.parent / "processed/PETS09"
     raw_path  = Path(__file__).parent.parent.parent / "raw/PETS09"
-    save_dir  = Path(__file__).parent.parent.parent / "unglued" / processed_id
+    save_dir  = Path(__file__).parent.parent.parent / "unglued" / f"{processed_id}"
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- load original frame ---
+    # 1. Load the 7-channel input ndarray
+    input_file = base_path / "input" / f"{processed_id}.npy"
+    if not input_file.exists():
+        raise FileNotFoundError(f"Input file not found: {input_file}")
+    
+    merged = np.load(input_file) # Shape: (H, W, 7)
+
+    # Slice the channels back into separate modalities
+    local_rgb     = merged[:, :, 0:3]
+    context_rgb   = merged[:, :, 3:6]
+    past_traj     = merged[:, :, 6]    # Grayscale (H, W)
+
+
+    # Load target (future trajectory heatmap)
+    target_file = base_path / "target" / f"{processed_id}.npy"
+    future_heatmap = np.load(target_file) if target_file.exists() else None
+
+    # Load original frame for anchor verification
     frame_file = raw_path / "frames" / f"frame_{original_frame_id}.jpg"
     original_frame = cv2.imread(str(frame_file))
-    if original_frame is None:
-        raise FileNotFoundError(f"Original frame not found: {frame_file}")
 
-    # --- load processed input ndarray ---
-    input_file = base_path / "input" / f"{processed_id}.npy"
-    merged = np.load(input_file, allow_pickle=True).item()  # .item() ak je uložený dict
-    traj_raster    = merged["traj_raster"]
-    local_rgb      = merged["local_rgb"]
-    context_rgb    = merged["context_rgb"]
-    obstacle_mask  = merged["obstacle_mask"]
-    anchor_xy      = merged["anchor_xy"]
+    # --- SAVE VISUALIZATIONS ---
+    # Local Zoom (Scale 2.0, same pixel coordinates for anchor)
+    cv2.imwrite(str(save_dir / "02_local_crop.jpg"), local_rgb)
 
-    # --- draw anchor on original frame ---
-    anchor_frame = original_frame.copy()
-    ax, ay = map(int, anchor_xy)
-    cv2.circle(anchor_frame, (ax, ay), radius=5, color=(0,0,255), thickness=-1)  # červený bod
-    cv2.imwrite(save_dir / "original_with_anchor.jpg", anchor_frame)
+    # Context View (Scale 1.0)
+    cv2.imwrite(str(save_dir / "03_context_crop.jpg"), context_rgb)
 
-    # --- save other images ---
-    cv2.imwrite(save_dir / "local_crop.jpg", local_rgb)
-    cv2.imwrite(save_dir / "context_crop.jpg", context_rgb)
-    cv2.imwrite(save_dir / "obstacle_mask.jpg", obstacle_mask)
+    # Past Trajectory (Grayscale to 3-channel for visualization)
+    cv2.imwrite(str(save_dir / "04_past_traj.jpg"), past_traj)
 
-    # --- past trajectory ---
-    traj_raster_rgb = traj_raster
-    if traj_raster_rgb.ndim == 2:
-        traj_raster_rgb = cv2.cvtColor(traj_raster_rgb, cv2.COLOR_GRAY2BGR)
-    cv2.imwrite(save_dir / "past_traj.jpg", traj_raster_rgb)
+    # Future Heatmap (Target)
+    if future_heatmap is not None:
+        # Convert to uint8 if it's float [0,1]
+        heatmap_viz = future_heatmap if future_heatmap.dtype == np.uint8 else (future_heatmap * 255).astype(np.uint8)
+        cv2.imwrite(str(save_dir / "05_future_heatmap.jpg"), heatmap_viz)
 
-    # --- future heatmap ---
-    target_file = base_path / "target" / f"{processed_id}.npy"
-    future_heatmap = np.load(target_file, allow_pickle=True)
-    if future_heatmap.max() > 1.0:
-        future_heatmap = future_heatmap / 255.0
+    # Global Obstacle Mask (Directly from raw)
+    mask_file = base_path / "obstacle_mask.npy"
+    if mask_file.exists():
+        obstacle_mask = np.load(mask_file)
+        cv2.imwrite(str(save_dir / "06_global_mask.jpg"), obstacle_mask)
+    else:
+        print(f"⚠️ Obstacle mask file not found: {mask_file}")
 
-    # convert to uint8 grayscale
-    heatmap_gray = (future_heatmap * 255).astype(np.uint8)
-    heatmap_gray_bgr = cv2.cvtColor(heatmap_gray, cv2.COLOR_GRAY2BGR)  # to save as 3-channel jpg
-    cv2.imwrite(save_dir / "future_heatmap.jpg", heatmap_gray_bgr)
-
-    print(f"✅ Saved all unglued images to: {save_dir}")
-
+    print(f"✅ Unglued visualizations saved to: {save_dir}")
 
 
 
