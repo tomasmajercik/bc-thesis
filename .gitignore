@@ -18,11 +18,12 @@ env/
 *.log
 
 # project specific ignores
-data/raw/*
-data/processed/*
+data/raw/
+data/processed/
 data/raw/.gitkeep
 data/processed/.gitkeep
 data/scripts/*.mp4
 data/scripts/debug_outputs/
+data/unglued/
 
 

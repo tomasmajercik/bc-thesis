@@ -59,6 +59,7 @@ def get_people_in_frame(xml_path, frame_id):
             return [int(obj.attrib["id"]) for obj in objectlist.findall("object")]
 
     return []
+
 def rasterize_past_traj(
     traj,
     frame_id,
@@ -174,10 +175,6 @@ def rasterize_future_traj(traj, frame_id, future_steps, height, width, method):
     heatmap = (heatmap * 255).astype(np.uint8)
 
     return heatmap
-
-
-
-
 def get_bbox(xml_path, frame_id, pid):
     tree = ET.parse(xml_path)
     root = tree.getroot()
@@ -204,42 +201,47 @@ def get_bbox(xml_path, frame_id, pid):
                 return xc, yc, w, h
 
     return None
-def bbox_crop(img, xc, yc, bw, bh, pad_w, pad_h):
+def get_anchor(bbox):
+    xc, yc, w, h = bbox
+    anchor_x = xc
+    anchor_y = yc + h / 2.0 # bottom center of bbox
+    return (anchor_x, anchor_y) 
+def zoom_n_crop(frame, anchor_point, scale):
     """
-    Crop image using bounding box + padding.
-    Pads with zeros if out of bounds.
+    Zoom into image with respect to anchor point (anchor point stays on the same position). 
     """
-    H, W = img.shape[:2]
+    H, W = frame.shape[:2]
+    ax, ay = anchor_point
 
-    x1 = int(round(xc - bw / 2 - pad_w))
-    y1 = int(round(yc - bh / 2 - pad_h))
-    x2 = int(round(xc + bw / 2 + pad_w))
-    y2 = int(round(yc + bh / 2 + pad_h))
+    # Calculate cropping box size
+    crop_w = W / scale
+    crop_h = H / scale
 
-    crop_w = x2 - x1
-    crop_h = y2 - y1
+    # Anchor point ratio in original image
+    ratio_x = ax / W
+    ratio_y = ay / H
 
-    crop = np.zeros((crop_h, crop_w, *img.shape[2:]), dtype=img.dtype)
+    # Top-left corner of crop to maintain anchor at same ratio
+    x1 = ax - crop_w * ratio_x
+    y1 = ay - crop_h * ratio_y
 
-    src_x1 = max(0, x1)
-    src_y1 = max(0, y1)
-    src_x2 = min(W, x2)
-    src_y2 = min(H, y2)
+    x2 = x1 + crop_w
+    y2 = y1 + crop_h
 
-    dst_x1 = src_x1 - x1
-    dst_y1 = src_y1 - y1
-    dst_x2 = dst_x1 + (src_x2 - src_x1)
-    dst_y2 = dst_y1 + (src_y2 - src_y1)
+    # Round and clamp
+    x1, y1 = int(round(x1)), int(round(y1))
+    x2, y2 = int(round(x2)), int(round(y2))
 
-    crop[dst_y1:dst_y2, dst_x1:dst_x2] = img[src_y1:src_y2, src_x1:src_x2]
+    x1 = max(0, x1)
+    y1 = max(0, y1)
+    x2 = min(x2, W)
+    y2 = min(y2, H)
 
-    return crop
-
-
-
+    cropped_part = frame[y1:y2, x1:x2]
+    return cv2.resize(cropped_part, (W, H), interpolation=cv2.INTER_LINEAR)
 
 if __name__ == "__main__":
-    INPUT_CFG, GT_CFG = load_params("utils/params.yaml")
+    INPUT_CFG, GT_CFG = load_params("configs/params.yaml")
 
     frames_dir  = Path("../raw/PETS09/frames")
     xml_path    = Path("../raw/PETS09/labels/annotations/PETS2009-S2L1.xml")
@@ -247,19 +249,19 @@ if __name__ == "__main__":
 
     # --- config ---
     past_steps              = INPUT_CFG["past_traj_steps"]
-    crop_w, crop_h          = INPUT_CFG["crop_size"]
-    ctx_w, ctx_h            = INPUT_CFG["context_size"]
-    mask_pad_w, mask_pad_h  = INPUT_CFG["obstacle_mask_size"]
+    local_scale             = INPUT_CFG["local_scale"]
+    context_scale           = INPUT_CFG["context_scale"]
     traj_method             = INPUT_CFG["traj_sampling_method"]
     # ================================
     future_steps            = GT_CFG["future_traj_steps"]
     gt_traj_method          = GT_CFG["traj_sampling_method"]
+    
     # ================================
     iterator = 0
     frame_ids = sorted([
         int(p.stem.split("_")[1])
-        # for p in frames_dir.glob("frame_*.jpg")
-        for p in frames_dir.glob("frame_0020.jpg") # DEBUG
+        # for p in frames_dir.glob("frame_*.jpg") # full run
+        for p in frames_dir.glob("frame_0528.jpg") # DEBUG
     ])
 
 
@@ -279,11 +281,10 @@ if __name__ == "__main__":
         # ==========================================================
         # OUTPUT CONTAINERS (this is what glue() will later consume)
         # ==========================================================
-        traj_rasters   = {}    # pid -> (H, W) uint8
-        local_crops    = {}    # pid -> (h, w, 3)
-        context_crops  = {}    # pid -> (hc, wc, 3)
-        obstacle_crops = {}    # pid -> (hm, wm) uint8
-        future_heatmaps = {}  # pid -> (H, W) float32
+        traj_rasters    = {}    # pid -> (H, W) uint8
+        local_crops     = {}    # pid -> (h, w, 3)
+        context_crops   = {}    # pid -> (hc, wc, 3)
+        future_heatmaps = {}    # pid -> (H, W) float32
 
         # ==========================================================
         # MAIN LOOP
@@ -303,24 +304,18 @@ if __name__ == "__main__":
             )
 
             if raster is None:
-                print(f"{ORANGE}[Warn]{RESET}pid {pid}: skipped (not enough past)")
+                print(f"{ORANGE}[Info]{RESET} pid {pid}: skipped (not enough past)")
                 continue
 
             # --- bounding box (for crop center) ---
             bbox = get_bbox(xml_path, frame_id, pid)
             if bbox is None:
-                print(f"{ORANGE}[Warn]{RESET}pid {pid}: missing bbox")
+                print(f"{ORANGE}[Warn]{RESET} pid {pid}: missing bbox")
                 continue
 
-            xc, yc, bw, bh = bbox
-
-            # --- crops ---
-            pad_w, pad_h = crop_w, crop_h
-            ctx_pad_w, ctx_pad_h = ctx_w, ctx_h
-
-            local_rgb   = bbox_crop(img, xc, yc, bw, bh, pad_w=pad_w, pad_h=pad_h)
-            context_rgb = bbox_crop(img, xc, yc, bw, bh, pad_w=ctx_pad_w, pad_h=ctx_pad_h)
-            mask_crop   = bbox_crop(obstacle_mask, xc, yc, bw, bh, pad_w=mask_pad_w, pad_h=mask_pad_h)
+            anchor_point = get_anchor(bbox)
+            local_rgb    = zoom_n_crop(img, anchor_point, local_scale)
+            context_rgb  = zoom_n_crop(img, anchor_point, context_scale)
 
             # --- future trajectory heatmap ---
             heatmap = rasterize_future_traj(
@@ -332,14 +327,11 @@ if __name__ == "__main__":
                 method=gt_traj_method
             )
 
-
             # --- store ---
             traj_rasters[pid]    = raster
             local_crops[pid]     = local_rgb
             context_crops[pid]   = context_rgb
-            obstacle_crops[pid]  = mask_crop
             future_heatmaps[pid] = heatmap
-
 
         # ==========================================================
         # Glue all together and save to a ndarray
@@ -352,7 +344,6 @@ if __name__ == "__main__":
                 traj_raster   = traj_rasters[pid],
                 local_rgb     = local_crops[pid],
                 context_rgb   = context_crops[pid],
-                obstacle_mask = obstacle_crops[pid],
                 save_path     = save_file
             )
 
@@ -360,23 +351,9 @@ if __name__ == "__main__":
             np.save(gt_file, future_heatmaps[pid])
 
             iterator += 1
+    
+    obstacle_mask_file = Path("../processed/PETS09/obstacle_mask.npy")
+    np.save(obstacle_mask_file, obstacle_mask)
 
-
-    import warnings
-    warnings.warn(
-        f"\n{ORANGE}[Warn]{RESET}Using allow_pickle=True, maybe you want to change that later "
-        "to pad the images? Now it is wrapped in an object array",
-        UserWarning
-    )
     print(f"{GREEN}[INFO]{RESET} 👉 Process completed in {(time.time() - start_time):.2f}s")
     print(f"{GREEN}[INFO]{RESET} ✅ Dataset processing done, outputs saved to: {save_file.parent}/*.npy")
-
-
-
-    """
-    3. veci ostavaju:
-        ✅ 1. implement unglue() ✅
-        ✅ 2. pre vsetky obrazky ✅
-        ✅ 3. tqdm ✅
-        4. .gitignore and git 
-    """
