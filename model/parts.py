@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 class DoubleConv(nn.Module):
     """
     Double convolution block: Conv -> Norm -> ReLU (x2)
@@ -28,7 +27,7 @@ class DoubleConv(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv2d(out_ch, out_ch, kernel_size=3, padding=1, groups=groups),
             NormLayer(out_ch),
-            nn.ReLU(inplace=False),
+            nn.ReLU(inplace=True),
         )
     
     def forward(self, x):
@@ -47,7 +46,6 @@ class Down(nn.Module):
     
     def forward(self, x):
         return self.maxpool_conv(x)
-
 
 class Up(nn.Module):
     """
@@ -68,14 +66,12 @@ class Up(nn.Module):
         # pad x1, x2 if shape mismatch
         diffY = x2.size()[2] - x1.size()[2]
         diffX = x2.size()[3] - x1.size()[3]
-        x1 = F.pad(x1, [diffX // 2, diffX-diffY // 2,
-                        diffY // 2, diffY-diffX // 2])
+        x1 = F.pad(x1, [diffX // 2, diffX-diffX // 2,
+                        diffY // 2, diffY-diffY // 2])
         
         x = torch.cat([x2, x1], dim=1) # skip connection
         return self.conv(x)
         
-
-
 class OutConv(nn.Module):
     """
     End of architecture, map feature maps to # of classes
