@@ -51,25 +51,26 @@ class Up(nn.Module):
     """
     Upscaling then double conv
     """
-    def __init__(self, in_ch, out_ch, bilinear=True, norm="batch"):
+    def __init__(self, x_ch, skip_ch, out_ch, bilinear=True, norm="batch"):
         super().__init__()
         if bilinear:
             self.up = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
         else:
-            self.up = nn.ConvTranspose2d(in_ch // 2, out_ch // 2, kernel_size=2, stride=2) 
+            self.up = nn.ConvTranspose2d(x_ch, x_ch, kernel_size=2, stride=2)
 
-        self.conv = DoubleConv(in_ch, out_ch, norm=norm)
+        self.conv = DoubleConv(x_ch + skip_ch, out_ch, norm=norm)
 
-    def forward(self, x1, x2): # x1: from bottom (decoder), x2: from left (skip)
-        x1 = self.up(x1)
+    def forward(self, x, skip): # x: from bottom (decoder), skip: from left
+        x = self.up(x)
 
-        # pad x1, x2 if shape mismatch
-        diffY = x2.size()[2] - x1.size()[2]
-        diffX = x2.size()[3] - x1.size()[3]
-        x1 = F.pad(x1, [diffX // 2, diffX-diffX // 2,
-                        diffY // 2, diffY-diffY // 2])
+        # pad x, skip if shape mismatch
+        diffY = skip.size(2) - x.size(2)
+        diffX = skip.size(3) - x.size(3)
+        x = F.pad(x, [diffX // 2, diffX-diffX // 2,
+                    diffY // 2, diffY-diffY // 2])
         
-        x = torch.cat([x2, x1], dim=1) # skip connection
+        x = torch.cat([skip, x], dim=1) # skip connection
+
         return self.conv(x)
         
 class OutConv(nn.Module):
