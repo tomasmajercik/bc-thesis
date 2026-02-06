@@ -353,6 +353,7 @@ if __name__ == "__main__":
             iterator += 1
     
     obstacle_mask_file = Path("../processed/PETS09/obstacle_mask.npy")
+    obstacle_mask = obstacle_mask[..., None]   # (H, W, 1)
     np.save(obstacle_mask_file, obstacle_mask)
 
     print(f"{GREEN}[INFO]{RESET} 👉 Process completed in {(time.time() - start_time):.2f}s")

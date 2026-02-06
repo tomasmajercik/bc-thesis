@@ -3,14 +3,14 @@ High-level model module.
 """
 import torch
 import torch.nn as nn
-from encoders import (
+from model.encoders import (
     PastTrajectoryEncoder,
     ImpassableEncoder,
     ContextEncoder,
     ZoomEncoder
 )
-from atention import AttentionFusion
-from decoder import Decoder
+from model.atention import AttentionFusion
+from model.decoder import Decoder
 
 class MultiEncoderUNet(nn.Module):
     def __init__(
@@ -19,50 +19,60 @@ class MultiEncoderUNet(nn.Module):
         impassable_channels,
         context_channels,
         zoom_channels,
-        fusion_type="attention" # or "concat" (not imported)
     ):
         super().__init__()
 
         ## ---------- Encoders (down) ---------- ##
-        self.past_enc   = PastTrajectoryEncoder(past_channels) 
-        self.impass_enc = ImpassableEncoder(impassable_channels)
-        self.ctx_enc    = ContextEncoder(context_channels)
-        self.zoom_enc   = ZoomEncoder(zoom_channels)
+        self.past_enc   = PastTrajectoryEncoder(in_channels=past_channels) 
+        self.impass_enc = ImpassableEncoder(in_channels=impassable_channels)
+        self.ctx_enc    = ContextEncoder(in_channels=context_channels)
+        self.zoom_enc   = ZoomEncoder(in_channels=zoom_channels)
 
-        ## ---------- Fusion (neck) ---------- ##
-        in_channels = [
-            [64, 128, 256, None]    # past
-            [32, 64, 128, None]     # context
-            [64, 128, 256, 512]     # impassable
-            [64, 128, 256, 512]     # zoom
-        ]
+        # ---- Channel bookkeeping (locked) ----
+        self.fused_channels = [224, 448, 896, 1024]
 
-        # This block expects fixed list of channels
-        fused_channels = [
-            sum(ch for ch in level if ch is not None)
-            for level in zip(*in_channels) # (tuple of channels)
-        ]
-
-        self.fusion = AttentionFusion(fused_channels)
-
+        # ---- Fusion + Decoder ----
+        self.fusion = AttentionFusion([
+            [64, 64, 32, 64],        # f1
+            [128, 128, 64, 128],     # f2
+            [256, 256, 128, 256],    # f3
+            [512, 512]               # f4 (only ctx + zoom)
+        ])
+    
         ## ---------- Decoder (up&out) ---------- ##
-        self.decoder = Decoder(fused_channels)
+        self.decoder = Decoder(self.fused_channels)
 
-    def forward(self, past, impassable, context, zoom):
-        enc_outputs = []
+    def forward(self, past, imp, ctx, zoom):
+        # Encode
+        e1 = self.past_enc(past)
+        e2 = self.impass_enc(imp)
+        e3 = self.ctx_enc(ctx)
+        e4 = self.zoom_enc(zoom)
 
-        enc_outputs.append(self.past_enc(past))
-        enc_outputs.append(self.impass_enc(impassable))
-        enc_outputs.append(self.ctx_enc(context))
-        enc_outputs.append(self.zoom_enc(zoom))
+        # Fuse
+        fused_feats, _ = self.fusion([e1, e2, e3, e4])
 
-        fused_feats, fused_channels = self.fusion(enc_outputs)
+        # Decode
+        out = self.decoder(fused_feats)
 
-        logits = self.decoder(fused_feats)
+        return out
 
-        return logits
+# dummy example
+if __name__ == "__main__":
+    model = MultiEncoderUNet(
+        past_channels = 1,
+        impassable_channels = 1,
+        context_channels = 3,
+        zoom_channels = 3
+    )
 
+    B, H, W = 2, 256, 256
 
+    past = torch.randn(B, 1, H, W)
+    imp  = torch.randn(B, 1, H, W)
+    ctx  = torch.randn(B, 3, H, W)
+    zoom = torch.randn(B, 3, H, W)
 
+    out = model(past, imp, ctx, zoom)
 
-
+    print("Output shape:", out.shape)

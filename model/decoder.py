@@ -3,7 +3,7 @@ Decoder classes
 """
 import torch
 import torch.nn as nn
-from parts import Up, OutConv
+from model.parts import Up, OutConv
 
 class Decoder(nn.Module):
     """

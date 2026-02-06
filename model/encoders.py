@@ -3,7 +3,7 @@ Encoder classes
 """
 import torch
 import torch.nn as nn
-from parts import DoubleConv, Down
+from model.parts import DoubleConv, Down
 
 class PastTrajectoryEncoder(nn.Module):
     """
