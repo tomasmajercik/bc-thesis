@@ -6,7 +6,7 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 from collections import defaultdict
 
-from utils.tools import glue
+from utils.tools import compose
 from utils.tools import load_params
 
 ORANGE = "\033[33m"
@@ -279,7 +279,7 @@ if __name__ == "__main__":
         print(f"{GREEN}[INFO]{RESET}👉 Frame {frame_id} has people: {people}")
 
         # ==========================================================
-        # OUTPUT CONTAINERS (this is what glue() will later consume)
+        # OUTPUT CONTAINERS (this is what compose() will later consume)
         # ==========================================================
         traj_rasters    = {}    # pid -> (H, W) uint8
         local_crops     = {}    # pid -> (h, w, 3)
@@ -334,13 +334,13 @@ if __name__ == "__main__":
             future_heatmaps[pid] = heatmap
 
         # ==========================================================
-        # Glue all together and save to a ndarray
+        # compose all together and save to a ndarray
         # ==========================================================
         for pid in traj_rasters.keys():
             save_file   = Path(f"../processed/PETS09/input/{iterator:04d}.npy")
             gt_dir      = Path("../processed/PETS09/target"); gt_dir.mkdir(parents=True, exist_ok=True)
 
-            glue(
+            compose(
                 traj_raster   = traj_rasters[pid],
                 local_rgb     = local_crops[pid],
                 context_rgb   = context_crops[pid],
@@ -353,6 +353,7 @@ if __name__ == "__main__":
             iterator += 1
     
     obstacle_mask_file = Path("../processed/PETS09/obstacle_mask.npy")
+    obstacle_mask = obstacle_mask[..., None]   # (H, W, 1)
     np.save(obstacle_mask_file, obstacle_mask)
 
     print(f"{GREEN}[INFO]{RESET} 👉 Process completed in {(time.time() - start_time):.2f}s")

@@ -15,7 +15,7 @@ def load_params(path="params.yaml"):
     print("✅ Parameter configuration loaded")
     return INPUT_CFG, GT_CFG
 
-def glue(traj_raster, local_rgb, context_rgb, save_path):
+def compose(traj_raster, local_rgb, context_rgb, save_path):
     """
     Merge the four inputs into one numpy array along the channels and save.
 
@@ -45,7 +45,7 @@ def glue(traj_raster, local_rgb, context_rgb, save_path):
     save_path.parent.mkdir(parents=True, exist_ok=True)
     np.save(save_path, merged)
 
-def unglue(original_frame_id, processed_id):
+def decompose(original_frame_id, processed_id):
     """
     Unglue the processed 7-channel ndarray and save separate visualizations.
     - channels 0-2: local_rgb
@@ -109,23 +109,23 @@ def unglue(original_frame_id, processed_id):
 
 
 if __name__ == "__main__":
-    unglue(
+    decompose(
         original_frame_id="0528",   # original photo
         processed_id="0000",        # processed input
     )
-    unglue(
+    decompose(
         original_frame_id="0528",   # original photo
         processed_id="0001",        # processed input
     )
-    unglue(
+    decompose(
         original_frame_id="0528",   # original photo
         processed_id="0002",        # processed input
     )
-    unglue(
+    decompose(
         original_frame_id="0528",   # original photo
         processed_id="0003",        # processed input
     )
-    unglue(
+    decompose(
         original_frame_id="0528",   # original photo
         processed_id="0004",        # processed input
     )
