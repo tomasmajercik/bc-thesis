@@ -28,18 +28,16 @@ class MultiEncoderUNet(nn.Module):
         self.ctx_enc    = ContextEncoder(in_channels=context_channels)
         self.zoom_enc   = ZoomEncoder(in_channels=zoom_channels)
 
-        # ---- Channel bookkeeping (locked) ----
-        self.fused_channels = [224, 448, 896, 1024]
-
         # ---- Fusion + Decoder ----
         self.fusion = AttentionFusion([
-            [64, 64, 32, 64],        # f1
+            [64, 64, 32, 64],        # f1 
             [128, 128, 64, 128],     # f2
             [256, 256, 128, 256],    # f3
             [512, 512]               # f4 (only ctx + zoom)
         ])
-    
+
         ## ---------- Decoder (up&out) ---------- ##
+        self.fused_channels = [224, 448, 896, 1024] # No. channels in such level (sum of output channels)
         self.decoder = Decoder(self.fused_channels)
 
     def forward(self, past, imp, ctx, zoom):
@@ -66,7 +64,7 @@ if __name__ == "__main__":
         zoom_channels = 3
     )
 
-    B, H, W = 2, 256, 256
+    B, H, W = 1, 256, 256
 
     past = torch.randn(B, 1, H, W)
     imp  = torch.randn(B, 1, H, W)
