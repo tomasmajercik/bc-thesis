@@ -260,8 +260,8 @@ if __name__ == "__main__":
     iterator = 0
     frame_ids = sorted([
         int(p.stem.split("_")[1])
-        # for p in frames_dir.glob("frame_*.jpg") # full run
-        for p in frames_dir.glob("frame_0528.jpg") # DEBUG
+        for p in frames_dir.glob("frame_*.jpg") # full run
+        # for p in frames_dir.glob("frame_0528.jpg") # DEBUG
     ])
 
 
