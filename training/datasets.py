@@ -1,10 +1,9 @@
 import os
 import torch
 import numpy as np
-from utils import np_2_tensor, ConsoleColors
 
 class PETSDataset(torch.utils.data.Dataset):
-    def __init__(self, root_dir="../data/processed/PETS09"):
+    def __init__(self, root_dir="data/processed/PETS09"):
         self.input_dir = os.path.join(root_dir, "input")
         self.target_dir = os.path.join(root_dir, "target")
 
