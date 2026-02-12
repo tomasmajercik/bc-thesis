@@ -15,6 +15,7 @@ env/
 .DS_Store
 
 # logs
+wandb
 *.log
 
 # project specific ignores
