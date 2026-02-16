@@ -146,7 +146,7 @@ def rasterize_future_traj(traj, frame_id, future_steps, height, width, method):
     idx = frames.index(frame_id)
     future = traj[idx + 1 : idx + 1 + future_steps]
     if len(future) == 0:
-        return None
+        return np.zeros((height, width), dtype=np.uint8) # Replace None with zeros
 
     n = len(future)
 
