@@ -17,7 +17,7 @@ class PETSDataset(torch.utils.data.Dataset):
 
         self.mask = torch.from_numpy(
             np.load(os.path.join(root_dir, "obstacle_mask.npy"))
-        ).permute(2,0,1).float()
+        ).permute(2,0,1).float() /255.0
 
     def _resize(self, t, scale):
         return F.interpolate(
@@ -38,13 +38,10 @@ class PETSDataset(torch.utils.data.Dataset):
         x = np.load(x_path)
         y = np.load(y_path)
 
-        target = torch.from_numpy(y).unsqueeze(0).float() / 255.0
-        if target.sum() < 1e-6:  # essentially all zeros
-            return self.__getitem__((idx + 1) % len(self.files))  # return next sample
-
-        zoom   = torch.from_numpy(x[:, :, 0:3]).permute(2,0,1).float()
-        ctx    = torch.from_numpy(x[:, :, 3:6]).permute(2,0,1).float()
-        past   = torch.from_numpy(x[:, :, 6:7]).permute(2,0,1).float()
+        target = torch.from_numpy(y).unsqueeze(0).float() /255.0
+        zoom   = torch.from_numpy(x[:, :, 0:3]).permute(2,0,1).float() /255.0
+        ctx    = torch.from_numpy(x[:, :, 3:6]).permute(2,0,1).float() /255.0
+        past   = torch.from_numpy(x[:, :, 6:7]).permute(2,0,1).float() /255.0
         impass = self.mask
 
         if self.scale != 1:

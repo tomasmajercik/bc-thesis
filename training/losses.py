@@ -24,76 +24,7 @@ class DiceLoss(nn.Module):
 
         return 1-dice_coef.mean()
     
-class WingLoss(nn.Module):
-    def __init__(self, omega=10, epsilon=2):
-        super().__init__()
-        self.omega = omega
-        self.epsilon = epsilon
-        self.c = omega - omega * np.log(1 + omega / epsilon)
-    
-    def forward(self, pred, target):
-        diff = torch.abs(pred - target)
-        loss = torch.where(
-            diff < self.omega,
-            self.omega * torch.log(1 + diff / self.epsilon),
-            diff - self.c
-        )
-        return loss.mean()
-    
-
-class FocalMSELoss(nn.Module):
-    """
-    Focal MSE that heavily weights the sparse non-zero regions.
-    Perfect for extremely sparse heatmaps (99.63% zeros).
-    """
-    def __init__(self, alpha=10.0, beta=2.0, gamma=2.0):
-        super().__init__()
-        self.alpha = alpha  # weight for non-zero regions
-        self.beta = beta    # weight for MSE component
-        self.gamma = gamma  # focal weight exponent
-        
-    def forward(self, pred, target):
-        # Binary mask for non-zero regions
-        mask = (target > 0.01).float()  # your min non-zero is 0.003922
-        
-        # MSE components
-        mse_all = F.mse_loss(pred, target, reduction='none')
-        mse_nonzero = mse_all * mask
-        
-        # Focal weighting (harder examples get more weight)
-        focal_weight = torch.abs(pred - target) ** self.gamma
-        
-        # Combine losses
-        loss_all = (mse_all * focal_weight).mean()
-        loss_nonzero = (mse_nonzero * focal_weight).mean()
-        
-        # Heavily weight the non-zero regions
-        total_loss = self.beta * loss_all + self.alpha * loss_nonzero
-        
-        return total_loss
-
-
-class WeightedMSELoss(nn.Module):
-    """
-    Simpler alternative: just heavily weight non-zero pixels.
-    """
-    def __init__(self, zero_weight=1.0, nonzero_weight=100.0):
-        super().__init__()
-        self.zero_weight = zero_weight
-        self.nonzero_weight = nonzero_weight
-        
-    def forward(self, pred, target):
-        # Create weight map
-        weights = torch.ones_like(target) * self.zero_weight
-        weights[target > 0.01] = self.nonzero_weight
-        
-        # Weighted MSE
-        mse = (pred - target) ** 2
-        weighted_mse = mse * weights
-        
-        return weighted_mse.mean()
-    
-class SparseHeatmapLoss(nn.Module): # this was so far cool
+class SparseHeatmapLoss(nn.Module): # this was best so far
     """
     Loss specifically for EXTREMELY sparse heatmaps (99.6% zeros).
     Combines:
@@ -133,32 +64,59 @@ class SparseHeatmapLoss(nn.Module): # this was so far cool
         return total_loss
 
 class NonZeroDiceLoss(nn.Module):
-    """
-    Dice Loss computed ONLY on non-zero target regions.
-    Ignores background pixels completely.
-    Good for sparse heatmaps where background dominates.
-    """
-    def __init__(self, smooth=1e-6, threshold=0.01):
+    def __init__(self, smooth=1e-6, threshold=0.5):
         super().__init__()
         self.smooth = smooth
-        self.threshold = threshold  # min value to consider "non-zero"
-        
+        self.threshold = threshold
+
     def forward(self, pred, target):
-        # Create mask for non-zero regions
         mask = (target > self.threshold).float()
-        
-        # Apply mask to both pred and target
+
+        if mask.sum() == 0:
+            # Return zero tensor with grad
+            return torch.zeros(1, device=pred.device, dtype=pred.dtype, requires_grad=True)
+
+        # Only select masked elements, keep them differentiable
         pred_masked = pred * mask
         target_masked = target * mask
-        
-        # Flatten
-        pred_flat = pred_masked.view(-1)
-        target_flat = target_masked.view(-1)
-        
-        # Dice coefficient on masked regions only
-        intersection = (pred_flat * target_flat).sum()
-        union = pred_flat.sum() + target_flat.sum()
-        
-        dice = (2.0 * intersection + self.smooth) / (union + self.smooth)
-        
+
+        intersection = (pred_masked * target_masked).sum()
+        union = pred_masked.sum() + target_masked.sum()
+
+        dice = (2 * intersection + self.smooth) / (union + self.smooth)
         return 1 - dice
+
+
+class SparseIoULoss(nn.Module):
+    """
+    Soft IoU / Jaccard loss that focuses only on non-zero target pixels.
+    Fully differentiable; ignores background pixels.
+    """
+    def __init__(self, target_threshold=0.5, smooth=1e-6):
+        super().__init__()
+        self.target_threshold = target_threshold
+        self.smooth = smooth
+
+    def forward(self, pred, target):
+        """
+        pred: [B,1,H,W] float in [0,1], model output after sigmoid
+        target: [B,1,H,W] float in [0,1], sparse ground truth
+        """
+        # Mask for non-zero target pixels
+        mask = (target > self.target_threshold).float()
+
+        # If no non-zero pixels, return zero loss (or small constant)
+        if mask.sum() == 0:
+            return torch.tensor(0.0, device=pred.device, requires_grad=True)
+
+        # Apply mask
+        pred_masked = pred * mask
+        target_masked = target * mask
+
+        # Soft IoU
+        intersection = (pred_masked * target_masked).sum()
+        union = pred_masked.sum() + target_masked.sum() - intersection
+
+        iou = (intersection + self.smooth) / (union + self.smooth)
+
+        return 1.0 - iou

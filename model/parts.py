@@ -79,10 +79,11 @@ class OutConv(nn.Module):
     """
     def __init__(self, in_ch, out_ch):
         super().__init__()
-        self.conv = nn.Conv2d(in_ch, out_ch, kernel_size=1) # pixel-wise prediction
+        self.conv   = nn.Conv2d(in_ch, out_ch, kernel_size=1) # pixel-wise prediction
+        self.act_fn = nn.Sigmoid() # output between 0-1
 
     def forward(self, x):
-        return self.conv(x)
+        return self.act_fn(self.conv(x))
 
 # if __name__ == "__main__":
     # x = torch.randn(1, 3, 128, 128) # [B, C, H, W]

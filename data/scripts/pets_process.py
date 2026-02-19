@@ -146,7 +146,7 @@ def rasterize_future_traj(traj, frame_id, future_steps, height, width, method):
     idx = frames.index(frame_id)
     future = traj[idx + 1 : idx + 1 + future_steps]
     if len(future) == 0:
-        return np.zeros((height, width), dtype=np.uint8) # Replace None with zeros
+        return None
 
     n = len(future)
 
@@ -155,7 +155,6 @@ def rasterize_future_traj(traj, frame_id, future_steps, height, width, method):
         if not (0 <= px < width and 0 <= py < height):
             continue
 
-        # --- THIS is the tear logic ---
         sigma = 2.0 + 3.0 * (i / max(1, n - 1))          # later → wider
         amp   = np.exp(-1.5 * i / max(1, n - 1))        # later → weaker
 
@@ -167,7 +166,6 @@ def rasterize_future_traj(traj, frame_id, future_steps, height, width, method):
 
         heatmap += tmp
 
-    # --- very light final smoothing (optional but recommended) ---
     heatmap = cv2.GaussianBlur(heatmap, (0, 0), sigmaX=1.0)
 
     # --- normalize to [0,255] ---
@@ -265,13 +263,13 @@ if __name__ == "__main__":
     ])
 
 
+    trajectories    = load_past_traj(xml_path)
     for frame_id in tqdm(frame_ids, desc="Processing frames"):
         # --- load frame ---
         img     = cv2.imread(str(frames_dir / f"frame_{frame_id:04d}.jpg"))
         H, W, _ = img.shape
 
         # --- load annotations ---
-        trajectories    = load_past_traj(xml_path)
         people          = get_people_in_frame(xml_path, frame_id)
         obstacle_mask   = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
         assert obstacle_mask is not None, "Obstacle mask not found"
@@ -326,6 +324,9 @@ if __name__ == "__main__":
                 width=W,
                 method=gt_traj_method
             )
+            if heatmap is None:
+                print(f"{ORANGE}[Info]{RESET} pid {pid}: skipped (not enough future)")
+                continue
 
             # --- store ---
             traj_rasters[pid]    = raster

@@ -27,4 +27,6 @@ data/scripts/*.mp4
 data/scripts/debug_outputs/
 data/unglued/
 outputs/
+checkpoints/
 
+dataset_samples.png
