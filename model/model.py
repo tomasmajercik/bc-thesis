@@ -1,5 +1,5 @@
 """
-High-level model module.
+model.py High-level model module.
 """
 import torch
 import torch.nn as nn
@@ -74,3 +74,8 @@ if __name__ == "__main__":
     out = model(past, imp, ctx, zoom)
 
     print("Output shape:", out.shape)
+
+
+# NO of params
+# num_params = sum(p.numel() for p in model.parameters())
+# print(f"Params: {num_params/1e6:.2f}M")

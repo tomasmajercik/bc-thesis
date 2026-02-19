@@ -15,6 +15,7 @@ env/
 .DS_Store
 
 # logs
+wandb
 *.log
 
 # project specific ignores
@@ -26,4 +27,6 @@ data/scripts/*.mp4
 data/scripts/debug_outputs/
 data/unglued/
 outputs/
+checkpoints/
 
+dataset_samples.png
