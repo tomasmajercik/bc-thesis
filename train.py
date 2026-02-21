@@ -40,7 +40,7 @@ if __name__ == "__main__":
     # criterion = SparseIoULoss()
 
     criterion = SparseHeatmapLoss(nonzero_weight=150.0, sparsity_weight=50.0) # best one so far
-    optimizer = optim.Adam(model.parameters(), lr=float(CFG['learning_rate'])) if CFG['optimizer'] == "adam" else None
+    optimizer = optim.Adam(model.parameters(), lr=float(CFG['learning_rate'])) # if CFG['optimizer'] == "adam" else None
 
     ## Setup for saving best model
     checkpoint_dir = Path("checkpoints")

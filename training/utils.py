@@ -94,7 +94,7 @@ def log_predictions_to_wandb(model, val_loader, epoch, device, num_samples=3):
         
         # Convert plot to image for wandb
         fig.canvas.draw()
-        img_array = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
+        img_array = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8) # pyright: ignore[reportAttributeAccessIssue]
         img_array = img_array.reshape(fig.canvas.get_width_height()[::-1] + (4,))
         img_array = img_array[:, :, :3]  # Drop alpha channel, keep RGB
         

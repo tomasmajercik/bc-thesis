@@ -32,7 +32,7 @@ if __name__ == "__main__":
     global_step = 0
     fold_val_losses = []
 
-    for fold, (train_idx, val_idx) in enumerate(kf.split(dataset)):
+    for fold, (train_idx, val_idx) in enumerate(kf.split(dataset)): # pyright: ignore[reportArgumentType]
         print(cc.INFO + f"\n--- Fold {fold+1}/{CFG['kf_n_splits']} ---")
 
         train_ds = Subset(dataset, train_idx.tolist())
