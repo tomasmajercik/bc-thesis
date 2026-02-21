@@ -79,14 +79,14 @@ def log_predictions_to_wandb(model, val_loader, epoch, device, num_samples=3):
         axes[3].axis('off')
         
         # 5. Ground Truth
-        target_img = target[i, 0].cpu().numpy()
-        axes[4].imshow(target_img, cmap='hot', vmin=0, vmax=1)
+        target_img = target[i, 0].cpu().numpy() * 255.0
+        axes[4].imshow(target_img, cmap='hot', vmin=0, vmax=255)
         axes[4].set_title(f'GT (max={target_img.max():.2f})')
         axes[4].axis('off')
         
         # 6. Prediction
-        pred_img = pred[i, 0].cpu().numpy()
-        axes[5].imshow(pred_img, cmap='hot', vmin=0, vmax=1)  # ← same as GT
+        pred_img = pred[i, 0].cpu().numpy() * 255.0
+        axes[5].imshow(pred_img, cmap='hot', vmin=0, vmax=255)
         axes[5].set_title(f'Pred (max={pred_img.max():.2f}, mean={pred_img.mean():.4f})')
         axes[5].axis('off')
         
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     ).to(DEVICE)
 
     # Load checkpoint
-    ckpt_path = "checkpoints/best_model.pth"
+    ckpt_path = "checkpoints/long-strict-w-imgs/best_model.pth"
     checkpoint = torch.load(ckpt_path, map_location=DEVICE)
 
     # Common checkpoint formats
@@ -138,6 +138,6 @@ if __name__ == "__main__":
 
     # Save images locally (no function changes)
     for i, img in enumerate(images):
-        img.image.save(f"preview_{i+1}.png")
+        img.image.save(f"previews/preview_.png")
 
 # run from root; python -m training.utils
