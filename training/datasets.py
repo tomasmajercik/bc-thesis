@@ -5,7 +5,7 @@ import numpy as np
 import torch.nn.functional as F
 
 class PETSDataset(torch.utils.data.Dataset):
-    def __init__(self, root_dir="data/processed/PETS09", scale=1):
+    def __init__(self, root_dir="data/processed/PETS09", scale=1.0):
         self.scale = scale
         self.input_dir = os.path.join(root_dir, "input")
         self.target_dir = os.path.join(root_dir, "target")

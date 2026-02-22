@@ -1,14 +1,15 @@
-train_ratio: 0.70
 batch_size: 4
-num_epochs: 40
 optimizer: "adam"
 learning_rate: 1e-4
 image_scale: 0.5   # 1.0 = full, 0.5 = half size
 
+num_epochs_in_k: 20
+kf_n_splits: 5
+
 wandb:
   use_wandb: true
   project: "bc-thesis"
-  run_name: "w-testing"
+  run_name: "cross-validation-1"
   log_interval: 1 # every N epoch
 
 debug: false

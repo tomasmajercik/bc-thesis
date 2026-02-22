@@ -37,6 +37,15 @@ def split_ds(train_ratio, dataset):
 
     return random_split(dataset, [train_size, val_size])
 
+def split_ds_w_test(train_ratio, dataset, val_ratio=0.1):
+    n = len(dataset)
+
+    train_size = int(train_ratio * n)
+    val_size   = int(val_ratio * n)
+    test_size  = n - train_size - val_size
+
+    return torch.utils.data.random_split(dataset, [train_size, val_size, test_size])
+
 def log_predictions_to_wandb(model, val_loader, epoch, device, num_samples=3):
     """
     Log prediction visualizations to Wandb.
@@ -79,14 +88,14 @@ def log_predictions_to_wandb(model, val_loader, epoch, device, num_samples=3):
         axes[3].axis('off')
         
         # 5. Ground Truth
-        target_img = target[i, 0].cpu().numpy()
-        axes[4].imshow(target_img, cmap='hot', vmin=0, vmax=1)
+        target_img = target[i, 0].cpu().numpy() * 255.0
+        axes[4].imshow(target_img, cmap='hot', vmin=0, vmax=255)
         axes[4].set_title(f'GT (max={target_img.max():.2f})')
         axes[4].axis('off')
         
         # 6. Prediction
-        pred_img = pred[i, 0].cpu().numpy()
-        axes[5].imshow(pred_img, cmap='hot', vmin=0, vmax=1)  # ← same as GT
+        pred_img = pred[i, 0].cpu().numpy() * 255.0
+        axes[5].imshow(pred_img, cmap='hot', vmin=0, vmax=255)
         axes[5].set_title(f'Pred (max={pred_img.max():.2f}, mean={pred_img.mean():.4f})')
         axes[5].axis('off')
         
@@ -94,7 +103,7 @@ def log_predictions_to_wandb(model, val_loader, epoch, device, num_samples=3):
         
         # Convert plot to image for wandb
         fig.canvas.draw()
-        img_array = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
+        img_array = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8) # pyright: ignore[reportAttributeAccessIssue]
         img_array = img_array.reshape(fig.canvas.get_width_height()[::-1] + (4,))
         img_array = img_array[:, :, :3]  # Drop alpha channel, keep RGB
         
@@ -122,7 +131,7 @@ if __name__ == "__main__":
     ).to(DEVICE)
 
     # Load checkpoint
-    ckpt_path = "checkpoints/best_model.pth"
+    ckpt_path = "checkpoints/long-strict-w-imgs/best_model.pth"
     checkpoint = torch.load(ckpt_path, map_location=DEVICE)
 
     # Common checkpoint formats
@@ -138,6 +147,6 @@ if __name__ == "__main__":
 
     # Save images locally (no function changes)
     for i, img in enumerate(images):
-        img.image.save(f"preview_{i+1}.png")
+        img.image.save(f"previews/preview_.png")
 
 # run from root; python -m training.utils
