@@ -6,9 +6,9 @@ learning_rate: 1e-4
 image_scale: 0.5   # 1.0 = full, 0.5 = half size
 
 wandb:
-  use_wandb: false
+  use_wandb: true
   project: "bc-thesis"
-  run_name: "dice-correct-imgs"
+  run_name: "w-testing"
   log_interval: 1 # every N epoch
 
-debug: true
+debug: false

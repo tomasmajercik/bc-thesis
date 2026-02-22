@@ -37,6 +37,15 @@ def split_ds(train_ratio, dataset):
 
     return random_split(dataset, [train_size, val_size])
 
+def split_ds_w_test(train_ratio, dataset, val_ratio=0.1):
+    n = len(dataset)
+
+    train_size = int(train_ratio * n)
+    val_size   = int(val_ratio * n)
+    test_size  = n - train_size - val_size
+
+    return torch.utils.data.random_split(dataset, [train_size, val_size, test_size])
+
 def log_predictions_to_wandb(model, val_loader, epoch, device, num_samples=3):
     """
     Log prediction visualizations to Wandb.
