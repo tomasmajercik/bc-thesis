@@ -118,14 +118,14 @@ if __name__ == "__main__":
     from torch.utils.data import DataLoader
     from training.datasets import PETSDataset
 
-    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-    dataset = PETSDataset(scale=0.5)
-    val_loader   = DataLoader(dataset, batch_size=1, shuffle=True)
+    DEVICE      = "cuda" if torch.cuda.is_available() else "cpu"
+    dataset     = PETSDataset(scale=0.5)
+    val_loader  = DataLoader(dataset, batch_size=1, shuffle=True)
 
     ## Load model
     model = MultiEncoderUNet(
         past_channels = 1,
-        impassable_channels = 1,
+        obstacle_channels = 1,
         context_channels = 3,
         zoom_channels = 3
     ).to(DEVICE)
@@ -147,6 +147,6 @@ if __name__ == "__main__":
 
     # Save images locally (no function changes)
     for i, img in enumerate(images):
-        img.image.save(f"previews/preview_.png")
+        img.image.save(f"previews/model_io/preview_.png")
 
 # run from root; python -m training.utils

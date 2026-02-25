@@ -28,7 +28,7 @@ samples = DataLoader(
 ## ----- Load Model ----- ##
 model = MultiEncoderUNet(
     past_channels=1,
-    impassable_channels=1,
+    obstacle_channels=1,
     context_channels=3,
     zoom_channels=3
 ).to(DEVICE)

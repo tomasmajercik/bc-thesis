@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from model.encoders import (
     PastTrajectoryEncoder,
-    ImpassableEncoder,
+    ObstacleEncoder,
     ContextEncoder,
     ZoomEncoder
 )
@@ -15,16 +15,16 @@ from model.decoder import Decoder
 class MultiEncoderUNet(nn.Module):
     def __init__(
         self, 
-        past_channels,
-        impassable_channels,
-        context_channels,
-        zoom_channels,
+        past_channels=1,
+        obstacle_channels=1,
+        context_channels=3,
+        zoom_channels=3
     ):
         super().__init__()
 
         ## ---------- Encoders (down) ---------- ##
         self.past_enc   = PastTrajectoryEncoder(in_channels=past_channels) 
-        self.impass_enc = ImpassableEncoder(in_channels=impassable_channels)
+        self.impass_enc = ObstacleEncoder(in_channels=obstacle_channels)
         self.ctx_enc    = ContextEncoder(in_channels=context_channels)
         self.zoom_enc   = ZoomEncoder(in_channels=zoom_channels)
 
@@ -59,7 +59,7 @@ class MultiEncoderUNet(nn.Module):
 if __name__ == "__main__":
     model = MultiEncoderUNet(
         past_channels = 1,
-        impassable_channels = 1,
+        obstacle_channels = 1,
         context_channels = 3,
         zoom_channels = 3
     )
