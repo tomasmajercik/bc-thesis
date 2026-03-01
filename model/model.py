@@ -40,7 +40,7 @@ class MultiEncoderUNet(nn.Module):
         self.fused_channels = [224, 448, 896, 1024] # No. channels in such level (sum of output channels)
         self.decoder = Decoder(self.fused_channels)
 
-    def forward(self, past, imp, ctx, zoom):
+    def forward(self, past, imp, ctx, zoom, return_attention=False):
         # Encode
         e1 = self.past_enc(past)
         e2 = self.impass_enc(imp)
@@ -48,10 +48,12 @@ class MultiEncoderUNet(nn.Module):
         e4 = self.zoom_enc(zoom)
 
         # Fuse
-        fused_feats, _ = self.fusion([e1, e2, e3, e4])
+        fused_feats, attention_weights = self.fusion([e1, e2, e3, e4])
 
         # Decode
         out = self.decoder(fused_feats)
+        if return_attention:
+            return out, attention_weights
 
         return out
 

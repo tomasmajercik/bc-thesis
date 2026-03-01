@@ -57,6 +57,7 @@ class AttentionFusion(nn.Module):
         """
         num_levels = len(enc_outputs[0])
         fused_feats = []
+        all_attentions = []
 
         for level in range(num_levels):
             level_feats = [
@@ -65,6 +66,7 @@ class AttentionFusion(nn.Module):
             ]
 
             att = self.attentions[level](level_feats) # (B, N)
+            all_attentions.append(att)
 
             weighted = []
             for i, f in enumerate(level_feats):
@@ -74,4 +76,4 @@ class AttentionFusion(nn.Module):
             fused = torch.cat(weighted, dim=1)
             fused_feats.append(fused)
     
-        return fused_feats, None
+        return fused_feats, all_attentions
