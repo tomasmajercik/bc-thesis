@@ -49,7 +49,8 @@ def plot_activation_grid(activations: dict[str, torch.Tensor], ios: tuple, mean_
     def render_feat(ax, feat, title):
         """Render mean activation map."""
         if mean_across_channels:
-            img = feat[0].mean(dim=0).cpu().numpy()
+            # img = feat[0].mean(dim=0).cpu().numpy()
+            img = torch.norm(feat[0], p=2, dim=0).cpu().numpy()
         else:
             img = feat[0].max(dim=0)[0].cpu().numpy()
             img = (img - img.min()) / (img.max() - img.min() + 1e-8)

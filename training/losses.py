@@ -4,6 +4,11 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
+class MAELoss(nn.Module):
+    """Mean absolute error over the entire heatmap"""
+    def forward(self, pred, target):
+        return torch.abs(pred - target).mean()
+    
 class DiceLoss(nn.Module):
     """
     https://cvinvolution.medium.com/dice-loss-in-medical-image-segmentation-d0e476eb486
