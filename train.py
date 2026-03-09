@@ -42,7 +42,7 @@ if __name__ == "__main__":
     # criterion = NonZeroDiceLoss(smooth=1e-6, threshold=0.01)
     # criterion = SparseIoULoss()
 
-    criterion = SparseHeatmapLoss(nonzero_weight=200.0, sparsity_weight=50.0) # best one so far
+    criterion = SparseHeatmapLoss(CFG['nonzero_weight'], CFG['sparsity_weight'])
     optimizer = optim.Adam(model.parameters(), lr=float(CFG['learning_rate'])) # if CFG['optimizer'] == "adam" else None
 
     ## Setup for saving best model

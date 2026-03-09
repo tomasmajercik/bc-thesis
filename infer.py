@@ -13,7 +13,7 @@ NO_SAMPLES = 20
 
 
 ## ----- Load Data ----- ##
-dataset = PETSDataset(scale=1)
+dataset = PETSDataset(scale=0.5)
 
 samples = DataLoader(
     dataset,
