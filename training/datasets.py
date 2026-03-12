@@ -5,19 +5,29 @@ import numpy as np
 import torch.nn.functional as F
 
 class PETSDataset(torch.utils.data.Dataset):
-    def __init__(self, root_dir="data/processed/PETS09", scale=1.0):
+    def __init__(self, root_dir="data/processed/PETS09", scale=0.5, return_coords=False):
         self.scale = scale
+        self.return_coords = return_coords
+
         self.input_dir = os.path.join(root_dir, "input")
         self.target_dir = os.path.join(root_dir, "target")
+        self.coords_dir = os.path.join(root_dir, "target_coords")
 
         self.files = sorted([
             f for f in os.listdir(self.input_dir)
             if f.endswith(".npy")
         ])
 
-        self.mask = torch.from_numpy(
-            np.load(os.path.join(root_dir, "obstacle_mask.npy"))
-        ).permute(2,0,1).float() /255.0
+        mask = np.load(os.path.join(root_dir, "obstacle_mask.npy"))
+        mask = mask.squeeze(-1)
+
+        # map colors to class ids
+        mask_class = np.zeros_like(mask, dtype=np.float32)
+        mask_class[mask == 0] = 0.0        # obstacle
+        mask_class[mask == 128] = 0.5      # grass (walkable but not main path)
+        mask_class[mask == 255] = 1.0      # road
+
+        self.mask = torch.from_numpy(mask_class).unsqueeze(0)
 
     def _resize(self, t, scale):
         return F.interpolate(
@@ -51,7 +61,24 @@ class PETSDataset(torch.utils.data.Dataset):
             zoom   = self._resize(zoom, self.scale)
             target = self._resize(target, self.scale)
 
+        if self.return_coords:
+            c_path = os.path.join(self.coords_dir, self.files[idx])
+            c = np.load(c_path)
+            coords = torch.from_numpy(c).float()
+            if self.scale != 1:
+                coords = coords * self.scale
+
+            # Pad to fixed length so DataLoader can collate
+            max_steps = 15  # set to your future_steps config value
+            n = coords.shape[0]
+            if n < max_steps:
+                pad = torch.full((max_steps - n, 2), -1.0)  # -1 flags invalid/missing
+                coords = torch.cat([coords, pad], dim=0)
+
+            return past, impass, ctx, zoom, target, coords    
+
         return past, impass, ctx, zoom, target
+            
     
 if __name__ == "__main__":
     ds = PETSDataset()

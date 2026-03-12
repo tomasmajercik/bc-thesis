@@ -25,9 +25,9 @@ class PastTrajectoryEncoder(nn.Module):
         # None because we don't have 4 layer and we want to keep the interface consistent
         return f1, f2, f3, None 
 
-class ImpassableEncoder(nn.Module):
+class ObstacleEncoder(nn.Module):
     """
-    U-Net encoder for impassable objects map
+    U-Net encoder for obstacle objects map
     """
     def __init__(self, in_channels):
         super().__init__()

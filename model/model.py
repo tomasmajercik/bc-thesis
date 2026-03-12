@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from model.encoders import (
     PastTrajectoryEncoder,
-    ImpassableEncoder,
+    ObstacleEncoder,
     ContextEncoder,
     ZoomEncoder
 )
@@ -15,16 +15,16 @@ from model.decoder import Decoder
 class MultiEncoderUNet(nn.Module):
     def __init__(
         self, 
-        past_channels,
-        impassable_channels,
-        context_channels,
-        zoom_channels,
+        past_channels=1,
+        obstacle_channels=1,
+        context_channels=3,
+        zoom_channels=3
     ):
         super().__init__()
 
         ## ---------- Encoders (down) ---------- ##
         self.past_enc   = PastTrajectoryEncoder(in_channels=past_channels) 
-        self.impass_enc = ImpassableEncoder(in_channels=impassable_channels)
+        self.impass_enc = ObstacleEncoder(in_channels=obstacle_channels)
         self.ctx_enc    = ContextEncoder(in_channels=context_channels)
         self.zoom_enc   = ZoomEncoder(in_channels=zoom_channels)
 
@@ -40,7 +40,7 @@ class MultiEncoderUNet(nn.Module):
         self.fused_channels = [224, 448, 896, 1024] # No. channels in such level (sum of output channels)
         self.decoder = Decoder(self.fused_channels)
 
-    def forward(self, past, imp, ctx, zoom):
+    def forward(self, past, imp, ctx, zoom, return_attention=False):
         # Encode
         e1 = self.past_enc(past)
         e2 = self.impass_enc(imp)
@@ -48,10 +48,12 @@ class MultiEncoderUNet(nn.Module):
         e4 = self.zoom_enc(zoom)
 
         # Fuse
-        fused_feats, _ = self.fusion([e1, e2, e3, e4])
+        fused_feats, attention_weights = self.fusion([e1, e2, e3, e4])
 
         # Decode
         out = self.decoder(fused_feats)
+        if return_attention:
+            return out, attention_weights
 
         return out
 
@@ -59,7 +61,7 @@ class MultiEncoderUNet(nn.Module):
 if __name__ == "__main__":
     model = MultiEncoderUNet(
         past_channels = 1,
-        impassable_channels = 1,
+        obstacle_channels = 1,
         context_channels = 3,
         zoom_channels = 3
     )

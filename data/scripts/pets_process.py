@@ -166,7 +166,7 @@ def rasterize_future_traj(traj, frame_id, future_steps, height, width, method):
 
         heatmap += tmp
 
-    heatmap = cv2.GaussianBlur(heatmap, (0, 0), sigmaX=1.0)
+    heatmap = cv2.GaussianBlur(heatmap, (0, 0), sigmaX=1.0) # type: ignore
 
     # --- normalize to [0,255] ---
     heatmap /= (heatmap.max() + 1e-8)
@@ -267,7 +267,7 @@ if __name__ == "__main__":
     for frame_id in tqdm(frame_ids, desc="Processing frames"):
         # --- load frame ---
         img     = cv2.imread(str(frames_dir / f"frame_{frame_id:04d}.jpg"))
-        H, W, _ = img.shape
+        H, W, _ = img.shape # type: ignore
 
         # --- load annotations ---
         people          = get_people_in_frame(xml_path, frame_id)
@@ -337,7 +337,8 @@ if __name__ == "__main__":
         # ==========================================================
         # compose all together and save to a ndarray
         # ==========================================================
-        for pid in traj_rasters.keys():
+        # for pid in traj_rasters.keys():
+        for pid in future_heatmaps.keys():
             save_file   = Path(f"../processed/PETS09/input/{iterator:04d}.npy")
             gt_dir      = Path("../processed/PETS09/target"); gt_dir.mkdir(parents=True, exist_ok=True)
 
@@ -351,6 +352,16 @@ if __name__ == "__main__":
             gt_file = gt_dir / f"{iterator:04d}.npy"
             np.save(gt_file, future_heatmaps[pid])
 
+            ## also save the coordinates for later evaluation
+            coords_dir = Path("../processed/PETS09/target_coords")
+            coords_dir.mkdir(parents=True, exist_ok=True)
+
+            frames_list = [f for (f, _, _) in trajectories[pid]]
+            idx = frames_list.index(frame_id)
+            future_coords = [(x, y) for (_, x, y) in trajectories[pid][idx + 1 : idx + 1 + future_steps]]
+
+            np.save(coords_dir / f"{iterator:04d}.npy", np.array(future_coords, dtype=np.float32))
+
             iterator += 1
     
     obstacle_mask_file = Path("../processed/PETS09/obstacle_mask.npy")
@@ -359,3 +370,6 @@ if __name__ == "__main__":
 
     print(f"{GREEN}[INFO]{RESET} 👉 Process completed in {(time.time() - start_time):.2f}s")
     print(f"{GREEN}[INFO]{RESET} ✅ Dataset processing done, outputs saved to: {save_file.parent}/*.npy")
+
+
+# run from `cd data/scripts` with `python pets_process.py`

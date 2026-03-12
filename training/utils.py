@@ -46,6 +46,17 @@ def split_ds_w_test(train_ratio, dataset, val_ratio=0.1):
 
     return torch.utils.data.random_split(dataset, [train_size, val_size, test_size])
 
+def split_ds_sequential(dataset, train_ratio=0.7, val_ratio=0.1):
+    n = len(dataset)
+    train_end = int(train_ratio * n)
+    val_end   = train_end + int(val_ratio * n)
+
+    train_ds = torch.utils.data.Subset(dataset, range(0, train_end))
+    val_ds   = torch.utils.data.Subset(dataset, range(train_end, val_end))
+    test_ds  = torch.utils.data.Subset(dataset, range(val_end, n))
+
+    return train_ds, val_ds, test_ds
+
 def log_predictions_to_wandb(model, val_loader, epoch, device, num_samples=3):
     """
     Log prediction visualizations to Wandb.
@@ -118,14 +129,14 @@ if __name__ == "__main__":
     from torch.utils.data import DataLoader
     from training.datasets import PETSDataset
 
-    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-    dataset = PETSDataset(scale=0.5)
-    val_loader   = DataLoader(dataset, batch_size=1, shuffle=True)
+    DEVICE      = "cuda" if torch.cuda.is_available() else "cpu"
+    dataset     = PETSDataset(scale=0.5)
+    val_loader  = DataLoader(dataset, batch_size=1, shuffle=True)
 
     ## Load model
     model = MultiEncoderUNet(
         past_channels = 1,
-        impassable_channels = 1,
+        obstacle_channels = 1,
         context_channels = 3,
         zoom_channels = 3
     ).to(DEVICE)
@@ -147,6 +158,6 @@ if __name__ == "__main__":
 
     # Save images locally (no function changes)
     for i, img in enumerate(images):
-        img.image.save(f"previews/preview_.png")
+        img.image.save(f"previews/model_io/preview_.png")
 
 # run from root; python -m training.utils
