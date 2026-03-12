@@ -1,19 +1,21 @@
 train_ratio: 0.70
+val_ratio: 0.20
 batch_size: 4
-num_epochs: 40
+num_epochs: 15
 optimizer: "adam"
 learning_rate: 5e-5
+weight_decay: 1e-4
 image_scale: 0.5   # 1.0 = full, 0.5 = half size
 
 # Loss fn
 nonzero_weight: 50.0
-sparsity_weight: 25.0
+sparsity_weight: 1.0
 
 
 wandb:
   use_wandb: true
   project: "bc-thesis"
-  run_name: "fix-predict-longer-future"
+  run_name: "last-hope"
   log_interval: 1 # every N epoch
 
 debug: false

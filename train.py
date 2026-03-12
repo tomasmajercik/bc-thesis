@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from model.model import MultiEncoderUNet
 from training.datasets import PETSDataset
 from training.losses import DiceLoss, NonZeroDiceLoss, SparseIoULoss, SparseHeatmapLoss
-from training.utils import ConsoleColors as cc, load_params, split_ds, split_ds_w_test, log_predictions_to_wandb
+from training.utils import ConsoleColors as cc, load_params, split_ds, split_ds_w_test, split_ds_sequential, log_predictions_to_wandb
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -23,10 +23,15 @@ if __name__ == "__main__":
     if CFG['debug']: dataset = torch.utils.data.Subset(dataset, range(20)) # debug
     
     # train_ds, val_ds = split_ds(CFG['train_ratio'], dataset)
-    train_ds, val_ds, test_ds = split_ds_w_test(CFG['train_ratio'], dataset, 0.1)
+    # train_ds, val_ds, test_ds = split_ds_w_test(CFG['train_ratio'], dataset, 0.1)
+    train_ds, val_ds, test_ds = split_ds_sequential(dataset, CFG['train_ratio'], CFG['val_ratio'])
+
     train_loader = DataLoader(train_ds, batch_size=CFG['batch_size'], shuffle=True)
-    val_loader   = DataLoader(val_ds, batch_size=CFG['batch_size'], shuffle=False)
-    test_loader = DataLoader(test_ds, batch_size=CFG['batch_size'], shuffle=False)
+    val_loader   = DataLoader(val_ds,   batch_size=CFG['batch_size'], shuffle=False)
+    test_loader  = DataLoader(test_ds,  batch_size=CFG['batch_size'], shuffle=False)
+    # train_loader = DataLoader(train_ds, batch_size=CFG['batch_size'], shuffle=True)
+    # val_loader   = DataLoader(val_ds, batch_size=CFG['batch_size'], shuffle=False)
+    # test_loader = DataLoader(test_ds, batch_size=CFG['batch_size'], shuffle=False)
 
     ## Load model
     model = MultiEncoderUNet(
@@ -43,7 +48,14 @@ if __name__ == "__main__":
     # criterion = SparseIoULoss()
 
     criterion = SparseHeatmapLoss(CFG['nonzero_weight'], CFG['sparsity_weight'])
-    optimizer = optim.Adam(model.parameters(), lr=float(CFG['learning_rate'])) # if CFG['optimizer'] == "adam" else None
+    optimizer = optim.Adam(model.parameters(), lr=float(CFG['learning_rate']), weight_decay=float(CFG['weight_decay']))
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, 
+        mode='min',        # minimize val loss
+        factor=0.5,        # halve the LR
+        patience=3,        # wait 3 epochs of no improvement
+        min_lr=1e-6
+    )
 
     ## Setup for saving best model
     checkpoint_dir = Path("checkpoints")
@@ -66,6 +78,7 @@ if __name__ == "__main__":
             loss = criterion(model_out, target.float())
 
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
 
             train_loss += loss.item()
@@ -85,12 +98,14 @@ if __name__ == "__main__":
 
                 val_loss += loss.item()
         val_loss /= len(val_loader)
+        scheduler.step(val_loss)
 
         # ---------------- LOGGING ----------------
         logger.log({
             "train_loss": train_loss,
             "val_loss": val_loss,
             "predictions": log_predictions_to_wandb(model, val_loader, epoch + 1, DEVICE, num_samples=3),
+            'lr': optimizer.param_groups[0]['lr']
         }, epoch+1)
 
         # ---------------- SAVE BEST MODEL ----------------
@@ -141,10 +156,7 @@ if __name__ == "__main__":
     best_checkpoint_path = checkpoint_dir / f"{CFG['wandb']['run_name']}" / "best_model.pth"
     checkpoint = torch.load(best_checkpoint_path, map_location=DEVICE)
 
-    if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
-        model.load_state_dict(checkpoint["state_dict"])
-    else:
-        model.load_state_dict(checkpoint["model_state_dict"])
+    model.load_state_dict(checkpoint["model_state_dict"])
 
     model.eval()
     test_loss = 0

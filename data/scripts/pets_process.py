@@ -166,7 +166,7 @@ def rasterize_future_traj(traj, frame_id, future_steps, height, width, method):
 
         heatmap += tmp
 
-    heatmap = cv2.GaussianBlur(heatmap, (0, 0), sigmaX=1.0)
+    heatmap = cv2.GaussianBlur(heatmap, (0, 0), sigmaX=1.0) # type: ignore
 
     # --- normalize to [0,255] ---
     heatmap /= (heatmap.max() + 1e-8)
@@ -267,7 +267,7 @@ if __name__ == "__main__":
     for frame_id in tqdm(frame_ids, desc="Processing frames"):
         # --- load frame ---
         img     = cv2.imread(str(frames_dir / f"frame_{frame_id:04d}.jpg"))
-        H, W, _ = img.shape
+        H, W, _ = img.shape # type: ignore
 
         # --- load annotations ---
         people          = get_people_in_frame(xml_path, frame_id)
