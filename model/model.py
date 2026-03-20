@@ -1,5 +1,5 @@
 """
-model.py High-level model module.
+model.py  High-level model module.
 """
 import torch
 import torch.nn as nn
@@ -7,77 +7,77 @@ from model.encoders import (
     PastTrajectoryEncoder,
     ObstacleEncoder,
     ContextEncoder,
-    ZoomEncoder
+    ZoomEncoder,
 )
 from model.atention import AttentionFusion
 from model.decoder import Decoder
 
+
+def _w(c, width):
+    return max(1, int(c * width))
+
+
 class MultiEncoderUNet(nn.Module):
     def __init__(
-        self, 
+        self,
         past_channels=1,
         obstacle_channels=1,
         context_channels=3,
-        zoom_channels=3
+        zoom_channels=3,
+        width=1.0,          # 0.5 = small  |  1.0 = base  |  2.0 = large
     ):
         super().__init__()
 
-        ## ---------- Encoders (down) ---------- ##
-        self.past_enc   = PastTrajectoryEncoder(in_channels=past_channels) 
-        self.impass_enc = ObstacleEncoder(in_channels=obstacle_channels)
-        self.ctx_enc    = ContextEncoder(in_channels=context_channels)
-        self.zoom_enc   = ZoomEncoder(in_channels=zoom_channels)
+        # ---------- Encoders ----------
+        self.past_enc   = PastTrajectoryEncoder(past_channels,     width=width)
+        self.impass_enc = ObstacleEncoder(obstacle_channels,       width=width)
+        self.ctx_enc    = ContextEncoder(context_channels,         width=width)
+        self.zoom_enc   = ZoomEncoder(zoom_channels,               width=width)
 
-        # ---- Fusion + Decoder ----
+        # ---------- Fusion ----------
+        # Channel lists per level — order matches forward(): [past, impass, ctx, zoom]
+        # f4 only has ctx + zoom (past and impass encoders return None at level 4)
         self.fusion = AttentionFusion([
-            [64, 64, 32, 64],        # f1 
-            [128, 128, 64, 128],     # f2
-            [256, 256, 128, 256],    # f3
-            [512, 512]               # f4 (only ctx + zoom)
+            [_w(64,  width), _w(32,  width), _w(64,  width), _w(64,  width)],  # f1
+            [_w(128, width), _w(64,  width), _w(128, width), _w(128, width)],  # f2
+            [_w(256, width), _w(128, width), _w(256, width), _w(256, width)],  # f3
+            [_w(512, width), _w(512, width)],                                   # f4
         ])
 
-        ## ---------- Decoder (up&out) ---------- ##
-        self.fused_channels = [224, 448, 896, 1024] # No. channels in such level (sum of output channels)
-        self.decoder = Decoder(self.fused_channels)
+        # ---------- Decoder ----------
+        fused_channels = [
+            _w(64,  width) + _w(32,  width) + _w(64,  width) + _w(64,  width),  # f1: 224 @ base
+            _w(128, width) + _w(64,  width) + _w(128, width) + _w(128, width),  # f2: 448 @ base
+            _w(256, width) + _w(128, width) + _w(256, width) + _w(256, width),  # f3: 896 @ base
+            _w(512, width) + _w(512, width),                                      # f4: 1024 @ base
+        ]
+        self.decoder = Decoder(fused_channels)
 
     def forward(self, past, imp, ctx, zoom, return_attention=False):
-        # Encode
         e1 = self.past_enc(past)
         e2 = self.impass_enc(imp)
         e3 = self.ctx_enc(ctx)
         e4 = self.zoom_enc(zoom)
 
-        # Fuse
         fused_feats, attention_weights = self.fusion([e1, e2, e3, e4])
 
-        # Decode
         out = self.decoder(fused_feats)
+
         if return_attention:
             return out, attention_weights
-
         return out
 
-# dummy example
+
+# ---------- quick sanity check ----------
 if __name__ == "__main__":
-    model = MultiEncoderUNet(
-        past_channels = 1,
-        obstacle_channels = 1,
-        context_channels = 3,
-        zoom_channels = 3
-    )
-
     B, H, W = 1, 256, 256
-
     past = torch.randn(B, 1, H, W)
     imp  = torch.randn(B, 1, H, W)
     ctx  = torch.randn(B, 3, H, W)
     zoom = torch.randn(B, 3, H, W)
 
-    out = model(past, imp, ctx, zoom)
-
-    print("Output shape:", out.shape)
-
-
-# NO of params
-# num_params = sum(p.numel() for p in model.parameters())
-# print(f"Params: {num_params/1e6:.2f}M")
+    for label, width in [("small", 0.5), ("base", 1.0), ("large", 2.0)]:
+        model  = MultiEncoderUNet(width=width)
+        out    = model(past, imp, ctx, zoom)
+        params = sum(p.numel() for p in model.parameters())
+        print(f"[{label:>5}]  width={width}  output={tuple(out.shape)}  params={params/1e6:.2f}M")

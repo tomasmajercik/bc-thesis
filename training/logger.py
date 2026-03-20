@@ -15,7 +15,8 @@ class WandbLogger:
             project = wandb_cfg.get("project", "bc-thesis"),
             name    = wandb_cfg.get("run_name"),
             entity  = "xmajercik-fiit-stu",
-            config  = cfg
+            config  = cfg,
+            group   = wandb_cfg.get("group")
         )
         self.log_interval = wandb_cfg.get("log_interval", 1)
         

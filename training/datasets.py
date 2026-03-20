@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import torch.nn.functional as F
 
-class PETSDataset(torch.utils.data.Dataset):
+class BaseDataset(torch.utils.data.Dataset):
     def __init__(self, root_dir="data/processed/PETS09", scale=0.5, return_coords=False):
         self.scale = scale
         self.return_coords = return_coords
@@ -69,7 +69,7 @@ class PETSDataset(torch.utils.data.Dataset):
                 coords = coords * self.scale
 
             # Pad to fixed length so DataLoader can collate
-            max_steps = 15  # set to your future_steps config value
+            max_steps = 30  # set to your future_steps config value
             n = coords.shape[0]
             if n < max_steps:
                 pad = torch.full((max_steps - n, 2), -1.0)  # -1 flags invalid/missing
@@ -79,7 +79,65 @@ class PETSDataset(torch.utils.data.Dataset):
 
         return past, impass, ctx, zoom, target
             
-    
+class PETSDataset(BaseDataset):
+    def __init__(self, root_dir="data/processed/PETS09", scale=0.5, return_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords)
+
+class StMarcDataset(BaseDataset):
+    def __init__(self, root_dir="data/processed/stmarc", scale=0.5, return_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords)
+ 
+class SherbrookeDataset(BaseDataset):
+    def __init__(self, root_dir="data/processed/sherbrooke", scale=0.5, return_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords)
+
+class AtriumDataset(BaseDataset):
+    def __init__(self, root_dir="data/processed/atrium", scale=0.5, return_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords)
+
+class RouenDataset(BaseDataset):
+    def __init__(self, root_dir="data/processed/rouen", scale=0.5, return_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords)
+ 
+class MOTS16_02Dataset(BaseDataset):
+    def __init__(self, root_dir="data/processed/MOT16_02", scale=0.35, return_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords)
+ 
 if __name__ == "__main__":
-    ds = PETSDataset()
-    PETSDataset.__getitem__(ds, 0)
+    print("--- PETSDataset ---")
+    pets = PETSDataset()
+    out  = pets[0]
+    print(f"  samples : {len(pets)}")
+    print(f"  shapes  : { {('past','impass','ctx','zoom','target')[i]: out[i].shape for i in range(5)} }")
+ 
+    print("--- StMarcDataset ---")
+    stmarc = StMarcDataset()
+    out    = stmarc[0]
+    print(f"  samples : {len(stmarc)}")
+    print(f"  shapes  : { {('past','impass','ctx','zoom','target')[i]: out[i].shape for i in range(5)} }")
+
+    print("--- SherbrookeDataset ---")
+    sherbrooke = SherbrookeDataset()
+    out        = sherbrooke[0]
+    print(f"  samples : {len(sherbrooke)}")
+    print(f"  shapes  : { {('past','impass','ctx','zoom','target')[i]: out[i].shape for i in range(5)} }")
+
+    print("--- AtriumDataset ---")
+    atrium = AtriumDataset()
+    out    = atrium[0]
+    print(f"  samples : {len(atrium)}")
+    print(f"  shapes  : { {('past','impass','ctx','zoom','target')[i]: out[i].shape for i in range(5)} }")
+
+    print("--- RouenDataset ---")
+    rouen = RouenDataset()
+    out   = rouen[0]
+    print(f"  samples : {len(rouen)}")
+    print(f"  shapes  : { {('past','impass','ctx','zoom','target')[i]: out[i].shape for i in range(5)} }")
+
+    print("--- MOTS16_02Dataset ---")
+    mots16_02 = MOTS16_02Dataset()
+    out        = mots16_02[0]
+    print(f"  samples : {len(mots16_02)}")
+    print(f"  shapes  : { {('past','impass','ctx','zoom','target')[i]: out[i].shape for i in range(5)} }")
+
+# python -m training.datasets
