@@ -57,70 +57,64 @@ def split_ds_sequential(dataset, train_ratio=0.7, val_ratio=0.1):
 
     return train_ds, val_ds, test_ds
 
-def log_predictions_to_wandb(model, val_loader, epoch, device, num_samples=3):
+def log_predictions_to_wandb(model, val_loader, epoch, device, num_samples=3, fixed_batch=None):
     """
     Log prediction visualizations to Wandb.
     Shows: Past Traj, Obstacle Mask, Context, Zoom, Ground Truth, Prediction
+
+    If fixed_batch is provided, always visualize the same samples across epochs.
     """
     model.eval()
-    
-    # Get one batch
-    batch = next(iter(val_loader))
-    past, imp, ctx, zoom, target = [x.to(device) for x in batch]
-    
+
+    batch = fixed_batch if fixed_batch is not None else next(iter(val_loader))
+
+    # slice [:5] so coords (index 5) are safely ignored if present
+    past, imp, ctx, zoom, target = [x.to(device) for x in batch[:5]]
+
     with torch.no_grad():
         pred = model(past, imp, ctx, zoom)
-    
+
     images_to_log = []
-    
     for i in range(min(num_samples, past.shape[0])):
         fig, axes = plt.subplots(1, 6, figsize=(18, 3))
-        
-        # 1. Past Trajectory
+
         axes[0].imshow(past[i, 0].cpu().numpy(), cmap='gray')
         axes[0].set_title('Past Traj')
         axes[0].axis('off')
-        
-        # 2. Obstacle Mask
+
         axes[1].imshow(imp[i, 0].cpu().numpy(), cmap='gray')
         axes[1].set_title('Obstacle Mask')
         axes[1].axis('off')
-        
-        # 3. Context
+
         ctx_img = ctx[i].permute(1, 2, 0).cpu().numpy()
         axes[2].imshow(ctx_img)
         axes[2].set_title('Context')
         axes[2].axis('off')
-        
-        # 4. Zoom
+
         zoom_img = zoom[i].permute(1, 2, 0).cpu().numpy()
         axes[3].imshow(zoom_img)
         axes[3].set_title('Zoom')
         axes[3].axis('off')
-        
-        # 5. Ground Truth
+
         target_img = target[i, 0].cpu().numpy() * 255.0
         axes[4].imshow(target_img, cmap='hot', vmin=0, vmax=255)
         axes[4].set_title(f'GT (max={target_img.max():.2f})')
         axes[4].axis('off')
-        
-        # 6. Prediction
+
         pred_img = pred[i, 0].cpu().numpy() * 255.0
         axes[5].imshow(pred_img, cmap='hot', vmin=0, vmax=255)
         axes[5].set_title(f'Pred (max={pred_img.max():.2f}, mean={pred_img.mean():.4f})')
         axes[5].axis('off')
-        
+
         plt.tight_layout()
-        
-        # Convert plot to image for wandb
+
         fig.canvas.draw()
-        img_array = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8) # pyright: ignore[reportAttributeAccessIssue]
+        img_array = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)  # pyright: ignore[reportAttributeAccessIssue]
         img_array = img_array.reshape(fig.canvas.get_width_height()[::-1] + (4,))
-        img_array = img_array[:, :, :3]  # Drop alpha channel, keep RGB
-        
+        img_array = img_array[:, :, :3]
         images_to_log.append(wandb.Image(img_array, caption=f"Sample {i+1} - Epoch {epoch}"))
         plt.close(fig)
-    
+
     model.train()
     return images_to_log
 

@@ -1,21 +1,34 @@
+# Training
 train_ratio: 0.70
 val_ratio: 0.20
 batch_size: 4
-num_epochs: 15
+num_epochs: 40
 optimizer: "adam"
 learning_rate: 5e-5
 weight_decay: 1e-4
 image_scale: 0.5   # 1.0 = full, 0.5 = half size
 
+# Model
+model_size: 1 # 0.5 = small, 1 = base, 2 = large, etc.
+
 # Loss fn
 nonzero_weight: 50.0
 sparsity_weight: 1.0
 
+# Metrics
+return_coords: true
+kld_weight: 0.5
+emd_weight: 20.0
+eps: 1e-8
+
+# Dataset
+dataset: "pets" # pets, stmarc, sherbrooke, atrium, rouen, mots16_02
 
 wandb:
   use_wandb: true
   project: "bc-thesis"
-  run_name: "last-hope"
+  run_name: "[full]EMDFourier-loss"
   log_interval: 1 # every N epoch
+  group: "wider-stroke-experiments" 
 
 debug: false
