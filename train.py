@@ -50,7 +50,15 @@ if __name__ == "__main__":
         width             = CFG['model_size'],
     ).to(DEVICE)
 
-    criterion = SparseHeatmapLoss(CFG['nonzero_weight'], CFG['sparsity_weight'])
+
+    from training.losses import EMDFourierLoss
+    criterion = EMDFourierLoss().to(DEVICE)
+
+    # fourier = FourierLoss().to(DEVICE)
+    # edge    = EdgeLoss().to(DEVICE)
+    # sparse   = SparseHeatmapLoss().to(DEVICE)
+    # emd     = EMDLoss().to(DEVICE)
+
     optimizer = optim.Adam(model.parameters(), lr=float(CFG['learning_rate']), weight_decay=float(CFG['weight_decay']))
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer,
@@ -113,12 +121,23 @@ if __name__ == "__main__":
                 val_fde  += fde_metric(model_out, target, coords).item()
                 val_mr   += mr_metric(model_out,  target, coords).item()
 
+                # edge_loss = edge(model_out, target.float()).item()
+                # fourier_loss = fourier(model_out, target.float()).item()
+                # sparse_loss = sparse(model_out, target.float()).item()
+                # emd_loss = emd(model_out, target.float()).item()
+
         n = len(val_loader)
         val_loss /= n
         val_emd  /= n
         val_kld  /= n
         val_fde  /= n
         val_mr   /= n
+
+        # print(cc.INFO + f"Component losses - Fourier: {fourier_loss:.4f}  Edge: {edge_loss:.4f}  Sparse: {sparse_loss:.4f}  EMD: {emd_loss:.4f}")
+
+
+
+        # print(f"sparse: {val_loss:.4f}  EMD: {val_emd:.4f}")
 
         scheduler.step(val_loss)
 
