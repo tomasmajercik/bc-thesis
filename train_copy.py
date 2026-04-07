@@ -13,7 +13,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 if __name__ == "__main__":
     ## Config ##
-    CFG    = load_params("training/config/training_cfg.yaml")
+    CFG    = load_params("training/config/training_cfg-copy.yaml")
     logger = WandbLogger(CFG)
 
     if DEVICE == "cpu": print(cc.WARN + f"Using cpu as a device\n")
@@ -51,8 +51,8 @@ if __name__ == "__main__":
     ).to(DEVICE)
 
 
-    from training.losses import EdgeLoss
-    criterion = EdgeLoss().to(DEVICE)
+    from training.losses import SparseEMDLoss
+    criterion = SparseEMDLoss().to(DEVICE)
 
     # fourier = FourierLoss().to(DEVICE)
     # edge    = EdgeLoss().to(DEVICE)
@@ -93,7 +93,7 @@ if __name__ == "__main__":
             past, imp, ctx, zoom, target, _ = [x.to(DEVICE) for x in batch]
 
             optimizer.zero_grad()
-            model_out = model(past, imp, ctx, torch.zeros_like(zoom))
+            model_out = model(past, imp, ctx, zoom)
             loss = criterion(model_out, target.float())
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
@@ -112,7 +112,7 @@ if __name__ == "__main__":
             for batch in val_loader:
                 past, imp, ctx, zoom, target, coords = [x.to(DEVICE) for x in batch]
 
-                model_out = model(past, imp, ctx, torch.zeros_like(zoom))
+                model_out = model(past, imp, ctx, zoom)
                 loss = criterion(model_out, target.float())
 
                 val_loss += loss.item()
@@ -189,7 +189,7 @@ if __name__ == "__main__":
         for batch in test_loader:
             past, imp, ctx, zoom, target, coords = [x.to(DEVICE) for x in batch]  # fix: unpack coords
 
-            model_out = model(past, imp, ctx, torch.zeros_like(zoom))
+            model_out = model(past, imp, ctx, zoom)
             loss = criterion(model_out, target.float())
 
             test_loss += loss.item()

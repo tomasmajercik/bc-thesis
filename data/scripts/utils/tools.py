@@ -53,8 +53,8 @@ def decompose(original_frame_id, processed_id):
     - channel 6: past_trajectory
     """
     # Define paths
-    base_path = Path(__file__).parent.parent.parent / "processed/MOT16_02"
-    raw_path  = Path(__file__).parent.parent.parent / "raw/stmarc"
+    base_path = Path(__file__).parent.parent.parent / "processed/PETS09"
+    raw_path  = Path(__file__).parent.parent.parent / "raw/PETS09"
     save_dir  = Path(__file__).parent.parent.parent / "unglued" / f"{processed_id}"
     save_dir.mkdir(parents=True, exist_ok=True)
 
@@ -111,7 +111,7 @@ def decompose(original_frame_id, processed_id):
 if __name__ == "__main__":
     decompose(
         original_frame_id="0528",   # original photo
-        processed_id="10000",        # processed input
+        processed_id="0000",        # processed input
     )
     # decompose(
     #     original_frame_id="0528",   # original photo
@@ -130,3 +130,4 @@ if __name__ == "__main__":
     #     processed_id="4000",        # processed input
     # )
 
+# run with: `cd /data/scripts` & `python -m utils.tools`
