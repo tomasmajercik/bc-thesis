@@ -288,6 +288,31 @@ class EdgeLoss(nn.Module):
 
         return F.mse_loss(pred_edge, target_edge)
     
+class EdgeSparseLoss(nn.Module): # edgeloss but should force the model to stretch the lines
+    def __init__(self, edge_weight=1.0, nonzero_weight=0.5):
+        super().__init__()
+        self.edge_weight    = float(edge_weight)
+        self.nonzero_weight = float(nonzero_weight)
+        sobel_x = torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=torch.float32)
+        sobel_y = torch.tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=torch.float32)
+        self.register_buffer('sobel_x', sobel_x.view(1, 1, 3, 3))
+        self.register_buffer('sobel_y', sobel_y.view(1, 1, 3, 3))
+
+    def forward(self, pred, target):
+        # --- Edge ---
+        sobel_x = self.sobel_x  # type: ignore
+        sobel_y = self.sobel_y  # type: ignore
+        pred_edge   = torch.sqrt(F.conv2d(pred,   sobel_x, padding=1) ** 2 + F.conv2d(pred,   sobel_y, padding=1) ** 2 + 1e-8)
+        target_edge = torch.sqrt(F.conv2d(target, sobel_x, padding=1) ** 2 + F.conv2d(target, sobel_y, padding=1) ** 2 + 1e-8)
+        edge = F.mse_loss(pred_edge, target_edge)
+
+        # --- Nonzero region MSE (forces line extent) ---
+        mask        = (target > 0.01).float()
+        n_nonzero   = mask.sum() + 1e-8
+        mse_nonzero = ((pred - target) ** 2 * mask).sum() / n_nonzero
+
+        return self.edge_weight * edge + self.nonzero_weight * mse_nonzero
+
 class FourierLoss(nn.Module):
     """
     Fourier loss from equation (13).

@@ -2,7 +2,7 @@
 train_ratio: 0.70
 val_ratio: 0.20
 batch_size: 4
-num_epochs: 25
+num_epochs: 30
 optimizer: "adam"
 learning_rate: 5e-5
 weight_decay: 1e-4
@@ -27,7 +27,7 @@ dataset: "pets" # pets, stmarc, sherbrooke, atrium, rouen, mots16_02
 wandb:
   use_wandb: true
   project: "bc-thesis"
-  run_name: "[no-zoom]Edge-loss"
+  run_name: "[Mid@21]SparseEMD-loss"
   log_interval: 1 # every N epoch
   group: "wider-stroke-experiments" 
 
