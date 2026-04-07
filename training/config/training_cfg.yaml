@@ -2,7 +2,7 @@
 train_ratio: 0.70
 val_ratio: 0.20
 batch_size: 4
-num_epochs: 25
+num_epochs: 40
 optimizer: "adam"
 learning_rate: 5e-5
 weight_decay: 1e-4
@@ -10,6 +10,7 @@ image_scale: 0.5   # 1.0 = full, 0.5 = half size
 
 # Model
 model_size: 1 # 0.5 = small, 1 = base, 2 = large, etc.
+use_lstm: true # whether to use LSTM or not
 
 # Loss fn
 nonzero_weight: 50.0
@@ -27,7 +28,7 @@ dataset: "pets" # pets, stmarc, sherbrooke, atrium, rouen, mots16_02
 wandb:
   use_wandb: true
   project: "bc-thesis"
-  run_name: "[no-zoom]Edge-loss"
+  run_name: "LSTM-sparseheatmap"
   log_interval: 1 # every N epoch
   group: "wider-stroke-experiments" 
 

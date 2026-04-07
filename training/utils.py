@@ -68,18 +68,21 @@ def log_predictions_to_wandb(model, val_loader, epoch, device, num_samples=3, fi
 
     batch = fixed_batch if fixed_batch is not None else next(iter(val_loader))
 
-    # slice [:5] so coords (index 5) are safely ignored if present
     past, imp, ctx, zoom, target = [x.to(device) for x in batch[:5]]
 
     with torch.no_grad():
-        pred = model(past, imp, ctx, zoom)
+        if model.use_lstm:
+            past_coords = batch[6].to(device)
+            pred = model(past_coords, imp, ctx, zoom)
+        else:
+            pred = model(past, imp, ctx, zoom)
 
     images_to_log = []
     for i in range(min(num_samples, past.shape[0])):
         fig, axes = plt.subplots(1, 6, figsize=(18, 3))
 
         axes[0].imshow(past[i, 0].cpu().numpy(), cmap='gray')
-        axes[0].set_title('Past Traj')
+        axes[0].set_title('Past Traj (raster)')
         axes[0].axis('off')
 
         axes[1].imshow(imp[i, 0].cpu().numpy(), cmap='gray')

@@ -9,6 +9,7 @@ from model.encoders import (
     ContextEncoder,
     ZoomEncoder,
 )
+from model.lstm_encoder import LSTMTrajectoryEncoder
 from model.atention import AttentionFusion
 from model.decoder import Decoder
 
@@ -25,11 +26,22 @@ class MultiEncoderUNet(nn.Module):
         context_channels=3,
         zoom_channels=3,
         width=1.0,          # 0.5 = small  |  1.0 = base  |  2.0 = large
+        use_lstm=False,     # True: past_enc is LSTMTrajectoryEncoder
+        past_traj_steps=21, # used only when use_lstm=True
+        lstm_hidden=256,    # used only when use_lstm=True
     ):
         super().__init__()
+        self.use_lstm = use_lstm
 
         # ---------- Encoders ----------
-        self.past_enc   = PastTrajectoryEncoder(past_channels,     width=width)
+        if use_lstm:
+            self.past_enc = LSTMTrajectoryEncoder(
+                past_traj_steps=past_traj_steps,
+                hidden_size=lstm_hidden,
+                width=width,
+            )
+        else:
+            self.past_enc = PastTrajectoryEncoder(past_channels, width=width)
         self.impass_enc = ObstacleEncoder(obstacle_channels,       width=width)
         self.ctx_enc    = ContextEncoder(context_channels,         width=width)
         self.zoom_enc   = ZoomEncoder(zoom_channels,               width=width)
@@ -54,7 +66,11 @@ class MultiEncoderUNet(nn.Module):
         self.decoder = Decoder(fused_channels)
 
     def forward(self, past, imp, ctx, zoom, return_attention=False):
-        e1 = self.past_enc(past)
+        if self.use_lstm:
+            H, W = imp.shape[2], imp.shape[3]
+            e1 = self.past_enc(past, H, W)
+        else:
+            e1 = self.past_enc(past)
         e2 = self.impass_enc(imp)
         e3 = self.ctx_enc(ctx)
         e4 = self.zoom_enc(zoom)
@@ -70,14 +86,23 @@ class MultiEncoderUNet(nn.Module):
 
 # ---------- quick sanity check ----------
 if __name__ == "__main__":
-    B, H, W = 1, 256, 256
-    past = torch.randn(B, 1, H, W)
-    imp  = torch.randn(B, 1, H, W)
-    ctx  = torch.randn(B, 3, H, W)
-    zoom = torch.randn(B, 3, H, W)
+    B, H, W, T = 1, 256, 256, 20
+    past  = torch.randn(B, 1, H, W)
+    imp   = torch.randn(B, 1, H, W)
+    ctx   = torch.randn(B, 3, H, W)
+    zoom  = torch.randn(B, 3, H, W)
+    coords = torch.rand(B, T, 2) * torch.tensor([W, H], dtype=torch.float32)
 
+    print("=== use_lstm=False ===")
     for label, width in [("small", 0.5), ("base", 1.0), ("large", 2.0)]:
-        model  = MultiEncoderUNet(width=width)
+        model  = MultiEncoderUNet(width=width, use_lstm=False)
         out    = model(past, imp, ctx, zoom)
+        params = sum(p.numel() for p in model.parameters())
+        print(f"[{label:>5}]  width={width}  output={tuple(out.shape)}  params={params/1e6:.2f}M")
+
+    print("=== use_lstm=True ===")
+    for label, width in [("small", 0.5), ("base", 1.0), ("large", 2.0)]:
+        model  = MultiEncoderUNet(width=width, use_lstm=True, past_traj_steps=T)
+        out    = model(coords, imp, ctx, zoom)
         params = sum(p.numel() for p in model.parameters())
         print(f"[{label:>5}]  width={width}  output={tuple(out.shape)}  params={params/1e6:.2f}M")

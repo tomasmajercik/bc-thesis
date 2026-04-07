@@ -17,6 +17,7 @@ env/
 # logs
 wandb
 *.log
+nohup.out
 
 # project specific ignores
 data/raw/

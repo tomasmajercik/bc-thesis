@@ -5,13 +5,15 @@ import numpy as np
 import torch.nn.functional as F
 
 class BaseDataset(torch.utils.data.Dataset):
-    def __init__(self, root_dir="data/processed/PETS09", scale=0.5, return_coords=False):
+    def __init__(self, root_dir="data/processed/PETS09", scale=0.5, return_coords=False, return_past_coords=False):
         self.scale = scale
         self.return_coords = return_coords
+        self.return_past_coords = return_past_coords
 
         self.input_dir = os.path.join(root_dir, "input")
         self.target_dir = os.path.join(root_dir, "target")
         self.coords_dir = os.path.join(root_dir, "target_coords")
+        self.past_coords_dir = os.path.join(root_dir, "past_coords")
 
         self.files = sorted([
             f for f in os.listdir(self.input_dir)
@@ -75,33 +77,59 @@ class BaseDataset(torch.utils.data.Dataset):
                 pad = torch.full((max_steps - n, 2), -1.0)  # -1 flags invalid/missing
                 coords = torch.cat([coords, pad], dim=0)
 
-            return past, impass, ctx, zoom, target, coords    
+            if self.return_past_coords:
+                past_coords = self._load_past_coords(idx)
+                return past, impass, ctx, zoom, target, coords, past_coords
+
+            return past, impass, ctx, zoom, target, coords
+
+        if self.return_past_coords:
+            past_coords = self._load_past_coords(idx)
+            return past, impass, ctx, zoom, target, past_coords
 
         return past, impass, ctx, zoom, target
+
+    def _load_past_coords(self, idx):
+        pc_path = os.path.join(self.past_coords_dir, self.files[idx])
+        pc = np.load(pc_path)
+        past_coords = torch.from_numpy(pc).float()
+        if self.scale != 1:
+            past_coords = past_coords * self.scale
+
+        # Pad to fixed length so DataLoader can collate
+        max_past_steps = 21  # must match past_traj_steps in data/scripts/configs/params.yaml
+        n = past_coords.shape[0]
+        if n < max_past_steps:
+            pad = torch.full((max_past_steps - n, 2), -1.0)  # -1 flags invalid/missing
+            past_coords = torch.cat([past_coords, pad], dim=0)
+        else:
+            past_coords = past_coords[:max_past_steps]
+
+        return past_coords
             
 class PETSDataset(BaseDataset):
-    def __init__(self, root_dir="data/processed/PETS09", scale=0.5, return_coords=False):
-        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords)
+    def __init__(self, root_dir="data/processed/PETS09", scale=0.5, return_coords=False, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, return_past_coords=return_past_coords)
 
 class StMarcDataset(BaseDataset):
-    def __init__(self, root_dir="data/processed/stmarc", scale=0.5, return_coords=False):
-        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords)
- 
+    def __init__(self, root_dir="data/processed/stmarc", scale=0.5, return_coords=False, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, return_past_coords=return_past_coords)
+
 class SherbrookeDataset(BaseDataset):
-    def __init__(self, root_dir="data/processed/sherbrooke", scale=0.5, return_coords=False):
-        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords)
+    def __init__(self, root_dir="data/processed/sherbrooke", scale=0.5, return_coords=False, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, return_past_coords=return_past_coords)
 
 class AtriumDataset(BaseDataset):
-    def __init__(self, root_dir="data/processed/atrium", scale=0.5, return_coords=False):
-        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords)
+    def __init__(self, root_dir="data/processed/atrium", scale=0.5, return_coords=False, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, return_past_coords=return_past_coords)
 
 class RouenDataset(BaseDataset):
-    def __init__(self, root_dir="data/processed/rouen", scale=0.5, return_coords=False):
-        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords)
- 
+    def __init__(self, root_dir="data/processed/rouen", scale=0.5, return_coords=False, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, return_past_coords=return_past_coords)
+
 class MOTS16_02Dataset(BaseDataset):
-    def __init__(self, root_dir="data/processed/MOT16_02", scale=0.35, return_coords=False):
-        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords)
+    def __init__(self, root_dir="data/processed/MOT16_02", scale=0.35, return_coords=False, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, return_past_coords=return_past_coords)
  
 if __name__ == "__main__":
     print("--- PETSDataset ---")

@@ -363,6 +363,19 @@ if __name__ == "__main__":
 
             np.save(coords_dir / f"{iterator:04d}.npy", np.array(future_coords, dtype=np.float32))
 
+            ## save past coords for LSTM encoder
+            past_coords_dir = Path("../processed/PETS09/past_coords")
+            past_coords_dir.mkdir(parents=True, exist_ok=True)
+
+            start = max(0, idx - past_steps + 1)
+            past_xy = [(x, y) for (_, x, y) in trajectories[pid][start : idx + 1]]
+            # pad with first position if fewer than past_steps frames available
+            if len(past_xy) < past_steps:
+                pad = [past_xy[0]] * (past_steps - len(past_xy))
+                past_xy = pad + past_xy
+
+            np.save(past_coords_dir / f"{iterator:04d}.npy", np.array(past_xy, dtype=np.float32))
+
             iterator += 1
     
     obstacle_mask_file = Path("../processed/PETS09/obstacle_mask.npy")
