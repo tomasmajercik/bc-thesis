@@ -96,11 +96,11 @@ if __name__ == "__main__":
 
         for batch in train_loader:
             if use_lstm:
-                _, imp, ctx, zoom, target, _, past_coords = [x.to(DEVICE) for x in batch]
-                model_out = model(past_coords, imp, ctx, zoom)
+                past, imp, ctx, zoom, target, _, past_coords = [x.to(DEVICE) for x in batch]
+                model_out = model(past, imp, ctx, torch.zeros_like(zoom), past_coords)
             else:
                 past, imp, ctx, zoom, target, _ = [x.to(DEVICE) for x in batch]
-                model_out = model(past, imp, ctx, zoom)
+                model_out = model(past, imp, ctx, torch.zeros_like(zoom))
 
             optimizer.zero_grad()
             loss = criterion(model_out, target.float())
@@ -120,11 +120,11 @@ if __name__ == "__main__":
         with torch.no_grad():
             for batch in val_loader:
                 if use_lstm:
-                    _, imp, ctx, zoom, target, coords, past_coords = [x.to(DEVICE) for x in batch]
-                    model_out = model(past_coords, imp, ctx, zoom)
+                    past, imp, ctx, zoom, target, coords, past_coords = [x.to(DEVICE) for x in batch]
+                    model_out = model(past, imp, ctx, torch.zeros_like(zoom), past_coords)
                 else:
                     past, imp, ctx, zoom, target, coords = [x.to(DEVICE) for x in batch]
-                    model_out = model(past, imp, ctx, zoom)
+                    model_out = model(past, imp, ctx, torch.zeros_like(zoom))
                 loss = criterion(model_out, target.float())
 
                 val_loss += loss.item()
@@ -200,11 +200,11 @@ if __name__ == "__main__":
     with torch.no_grad():
         for batch in test_loader:
             if use_lstm:
-                _, imp, ctx, zoom, target, coords, past_coords = [x.to(DEVICE) for x in batch]
-                model_out = model(past_coords, imp, ctx, zoom)
+                past, imp, ctx, zoom, target, coords, past_coords = [x.to(DEVICE) for x in batch]
+                model_out = model(past, imp, ctx, torch.zeros_like(zoom), past_coords)
             else:
                 past, imp, ctx, zoom, target, coords = [x.to(DEVICE) for x in batch]
-                model_out = model(past, imp, ctx, zoom)
+                model_out = model(past, imp, ctx, torch.zeros_like(zoom))
             loss = criterion(model_out, target.float())
 
             test_loss += loss.item()
