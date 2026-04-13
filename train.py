@@ -59,6 +59,12 @@ if __name__ == "__main__":
     criterion = TverskyLoss(alpha=CFG['alpha'], beta=CFG['beta']).to(DEVICE)
     # from training.losses import ChamferHeatmapLoss
     # criterion = ChamferHeatmapLoss(top_k_frac=CFG['top_k_frac']).to(DEVICE)
+    # from training.losses import RecallWithToleranceLoss
+    # criterion = RecallWithToleranceLoss(
+    #     tolerance_px=10,
+    #     recall_weight=15.0,
+    #     precision_weight=0.3,
+    # ).to(DEVICE)
 
     # fourier = FourierLoss().to(DEVICE)
     # edge    = EdgeLoss().to(DEVICE)
