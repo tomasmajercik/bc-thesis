@@ -219,3 +219,99 @@ class MRMetric(CoordMetric):
             misses.append((dist > self.threshold_px).float())
 
         return torch.stack(misses).mean()
+
+class NLLMetric(HeatmapMetric):
+    """
+    Negative Log-Likelihood of GT final position under predicted heatmap distribution.
+    Heatmap is normalized to sum to 1 (treated as discrete probability distribution).
+    Lower = better. Penalizes confident wrong predictions heavily.
+    
+    Rewards models that assign probability mass near the true future position,
+    even if the prediction is uncertain/spread out.
+    """
+    def __init__(self, eps=1e-8):
+        super().__init__()
+        self.eps = eps
+
+    def forward(self, pred, target, coords):
+        """
+        coords: (B, future_steps, 2) — last entry is the final GT position
+        """
+        B = pred.shape[0]
+        H = pred.shape[-2]
+        W = pred.shape[-1]
+        nll_vals = []
+
+        for i in range(B):
+            p = pred[i].squeeze().float()           # (H, W)
+
+            # Normalize to valid probability distribution
+            p = p / (p.sum() + self.eps)
+
+            # GT final position
+            gt_x = int(coords[i, -1, 0].item())
+            gt_y = int(coords[i, -1, 1].item())
+
+            # Clamp to valid range
+            gt_x = max(0, min(gt_x, W - 1))
+            gt_y = max(0, min(gt_y, H - 1))
+
+            prob = p[gt_y, gt_x]
+            nll_vals.append(-torch.log(prob + self.eps))
+
+        return torch.stack(nll_vals).mean()
+
+
+class TopKCoverageMetric(CoordMetric):
+    """
+    Top-K Coverage.
+    Checks whether the GT final position falls within the top-k% 
+    of predicted probability mass.
+    Higher = better.
+
+    Rewards uncertain but correct predictions — a diffuse heatmap that 
+    covers the true location scores well, whereas a confident wrong 
+    prediction (e.g. Kalman on a turning pedestrian) scores 0.
+
+    This is where heatmap models structurally outperform point estimates.
+    """
+    def __init__(self, k: float = 0.1):
+        """
+        k: fraction of pixels considered (e.g. 0.1 = top 10% by probability mass)
+        """
+        super().__init__()
+        self.k = k
+
+    def forward(self, pred, target, coords):
+        """
+        coords: (B, future_steps, 2) — last entry is the final GT position
+        """
+        B = pred.shape[0]
+        H = pred.shape[-2]
+        W = pred.shape[-1]
+        covered = []
+
+        for i in range(B):
+            p = pred[i].squeeze().float()           # (H, W)
+
+            # Normalize
+            p_norm = p / (p.sum() + 1e-8)
+
+            # Find threshold: top-k% of probability mass
+            flat = p_norm.flatten()
+            sorted_vals, _ = torch.sort(flat, descending=True)
+            cumsum = torch.cumsum(sorted_vals, dim=0)
+            # Number of pixels needed to accumulate k of total mass
+            n_pixels = (cumsum <= self.k).sum().item() + 1
+            threshold = sorted_vals[min(n_pixels, len(sorted_vals) - 1)]
+
+            # GT final position
+            gt_x = int(coords[i, -1, 0].item())
+            gt_y = int(coords[i, -1, 1].item())
+            gt_x = max(0, min(gt_x, W - 1))
+            gt_y = max(0, min(gt_y, H - 1))
+
+            in_top_k = (p_norm[gt_y, gt_x] >= threshold).float()
+            covered.append(in_top_k)
+
+        return torch.stack(covered).mean()

@@ -10,10 +10,14 @@ image_scale: 0.5   # 1.0 = full, 0.5 = half size
 
 # Model
 model_size: 1 # 0.5 = small, 1 = base, 2 = large, etc.
+use_lstm: false # whether to use LSTM or not
 
 # Loss fn
 nonzero_weight: 50.0
 sparsity_weight: 1.0
+# top_k_frac: 0.05 # for ChamferHeatmapLoss
+alpha: 0.3 # for TverskyLoss
+beta: 0.7  # for TverskyLoss
 
 # Metrics
 return_coords: true
@@ -27,8 +31,8 @@ dataset: "pets" # pets, stmarc, sherbrooke, atrium, rouen, mots16_02
 wandb:
   use_wandb: true
   project: "bc-thesis"
-  run_name: "[Mid@21]SparseEMD-loss"
+  run_name: "TverskyLoss"
   log_interval: 1 # every N epoch
-  group: "wider-stroke-experiments" 
+  group: "length-thickness-experiments" 
 
 debug: false

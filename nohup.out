@@ -1,0 +1,2 @@
+bash: line 1: 1322746 Killed                  python -u train.py > mackopes1.log 2>&1
+bash: line 1: 1329588 Killed                  python -u train_copy.py > mackopes2.log 2>&1

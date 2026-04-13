@@ -5,7 +5,7 @@ from training.logger import WandbLogger
 from torch.utils.data import DataLoader
 from model.model import MultiEncoderUNet
 from training.metrics import EMDMetric, KLDMetric, FDEMetric, MRMetric
-from training.datasets import PETSDataset, StMarcDataset, SherbrookeDataset, AtriumDataset, RouenDataset, MOTS16_02Dataset
+from training.datasets import PETSDataset, PETSDatasetST, StMarcDataset, SherbrookeDataset, AtriumDataset, RouenDataset, MOTS16_02Dataset
 from training.losses import DiceLoss, NonZeroDiceLoss, SparseIoULoss, SparseHeatmapLoss
 from training.utils import ConsoleColors as cc, load_params, split_ds, split_ds_w_test, split_ds_sequential, log_predictions_to_wandb
 
@@ -20,18 +20,22 @@ if __name__ == "__main__":
     else: print(cc.INFO + f"Using gpu as a device\n")
 
     ## Load dataset
+    use_lstm = CFG.get('use_lstm', False)
+
     if CFG['dataset'] == "pets":
-        dataset = PETSDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'])
+        # dataset = PETSDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
+        from training.datasets import PETSDatasetLT
+        dataset = PETSDatasetLT(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
     elif CFG['dataset'] == "stmarc":
-        dataset = StMarcDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'])
+        dataset = StMarcDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
     elif CFG['dataset'] == "sherbrooke":
-        dataset = SherbrookeDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'])
+        dataset = SherbrookeDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
     elif CFG['dataset'] == "atrium":
-        dataset = AtriumDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'])
+        dataset = AtriumDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
     elif CFG['dataset'] == "rouen":
-        dataset = RouenDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'])
+        dataset = RouenDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
     elif CFG['dataset'] == "mots16_02":
-        dataset = MOTS16_02Dataset(scale=(CFG['image_scale'] - 0.15), return_coords=CFG['return_coords'])
+        dataset = MOTS16_02Dataset(scale=(CFG['image_scale'] - 0.15), return_coords=CFG['return_coords'], return_past_coords=use_lstm)
 
     if CFG['debug']: dataset = torch.utils.data.Subset(dataset, range(20))
 
@@ -48,11 +52,13 @@ if __name__ == "__main__":
         context_channels  = 3,
         zoom_channels     = 3,
         width             = CFG['model_size'],
+        use_lstm          = use_lstm,
     ).to(DEVICE)
 
-
-    from training.losses import EdgeLoss
-    criterion = EdgeLoss().to(DEVICE)
+    from training.losses import TverskyLoss
+    criterion = TverskyLoss(alpha=CFG['alpha'], beta=CFG['beta']).to(DEVICE)
+    # from training.losses import ChamferHeatmapLoss
+    # criterion = ChamferHeatmapLoss(top_k_frac=CFG['top_k_frac']).to(DEVICE)
 
     # fourier = FourierLoss().to(DEVICE)
     # edge    = EdgeLoss().to(DEVICE)
@@ -90,10 +96,14 @@ if __name__ == "__main__":
         train_loss = 0
 
         for batch in train_loader:
-            past, imp, ctx, zoom, target, _ = [x.to(DEVICE) for x in batch]
+            if use_lstm:
+                past, imp, ctx, zoom, target, _, past_coords = [x.to(DEVICE) for x in batch]
+                model_out = model(past, imp, ctx, torch.zeros_like(zoom), past_coords)
+            else:
+                past, imp, ctx, zoom, target, _ = [x.to(DEVICE) for x in batch]
+                model_out = model(past, imp, ctx, torch.zeros_like(zoom))
 
             optimizer.zero_grad()
-            model_out = model(past, imp, ctx, torch.zeros_like(zoom))
             loss = criterion(model_out, target.float())
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
@@ -110,9 +120,12 @@ if __name__ == "__main__":
 
         with torch.no_grad():
             for batch in val_loader:
-                past, imp, ctx, zoom, target, coords = [x.to(DEVICE) for x in batch]
-
-                model_out = model(past, imp, ctx, torch.zeros_like(zoom))
+                if use_lstm:
+                    past, imp, ctx, zoom, target, coords, past_coords = [x.to(DEVICE) for x in batch]
+                    model_out = model(past, imp, ctx, torch.zeros_like(zoom), past_coords)
+                else:
+                    past, imp, ctx, zoom, target, coords = [x.to(DEVICE) for x in batch]
+                    model_out = model(past, imp, ctx, torch.zeros_like(zoom))
                 loss = criterion(model_out, target.float())
 
                 val_loss += loss.item()
@@ -187,9 +200,12 @@ if __name__ == "__main__":
 
     with torch.no_grad():
         for batch in test_loader:
-            past, imp, ctx, zoom, target, coords = [x.to(DEVICE) for x in batch]  # fix: unpack coords
-
-            model_out = model(past, imp, ctx, torch.zeros_like(zoom))
+            if use_lstm:
+                past, imp, ctx, zoom, target, coords, past_coords = [x.to(DEVICE) for x in batch]
+                model_out = model(past, imp, ctx, torch.zeros_like(zoom), past_coords)
+            else:
+                past, imp, ctx, zoom, target, coords = [x.to(DEVICE) for x in batch]
+                model_out = model(past, imp, ctx, torch.zeros_like(zoom))
             loss = criterion(model_out, target.float())
 
             test_loss += loss.item()

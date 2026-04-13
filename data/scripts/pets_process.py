@@ -135,7 +135,21 @@ def rasterize_future_traj(traj, frame_id, future_steps, height, width, method):
     Returns a float32 heatmap in [0,1].
     """
     if method != "gaussian":
-        raise NotImplementedError
+        heatmap = np.zeros((height, width), dtype=np.uint8)
+        frames = [f for (f, _, _) in traj]
+        if frame_id not in frames:
+            return None
+        idx = frames.index(frame_id)
+        future = traj[idx + 1 : idx + 1 + future_steps]
+        if len(future) == 0:
+            return None
+        pts = [(int(round(x)), int(round(y))) for (_, x, y) in future]
+        for i in range(len(pts) - 1):
+            cv2.line(heatmap, pts[i], pts[i + 1], color=255, thickness=10)
+        # mark the last point too (single-point future)
+        if len(pts) == 1:
+            cv2.circle(heatmap, pts[0], radius=5, color=255, thickness=-1)
+        return heatmap
 
     heatmap = np.zeros((height, width), dtype=np.float32)
 
@@ -155,8 +169,8 @@ def rasterize_future_traj(traj, frame_id, future_steps, height, width, method):
         if not (0 <= px < width and 0 <= py < height):
             continue
 
-        # sigma = 2.0 + 3.0 * (i / max(1, n - 1))          # later → wider
-        sigma = 5 + 4.0 * (i / max(1, n - 1)) # 🚨 experiment with wider
+        sigma = 2.0 + 3.0 * (i / max(1, n - 1))          # later → wider (old)
+        # sigma = 12.0 + 5.0 * (i / max(1, n - 1)) # 🚨 experiment with wider
         amp   = np.exp(-1.5 * i / max(1, n - 1))        # later → weaker
 
         ksize = int(6 * sigma + 1) | 1
@@ -240,8 +254,9 @@ def zoom_n_crop(frame, anchor_point, scale):
     return cv2.resize(cropped_part, (W, H), interpolation=cv2.INTER_LINEAR)
 
 if __name__ == "__main__":
-    INPUT_CFG, GT_CFG = load_params("configs/params.yaml")
+    INPUT_CFG, GT_CFG = load_params("configs/old_params.yaml")
 
+    save_name   = GT_CFG.get("save_as", "PETS09")
     frames_dir  = Path("../raw/PETS09/frames")
     xml_path    = Path("../raw/PETS09/labels/annotations/PETS2009-S2L1.xml")
     mask_path   = Path("../raw/PETS09/masks/obstacle_mask.png")
@@ -260,7 +275,7 @@ if __name__ == "__main__":
     frame_ids = sorted([
         int(p.stem.split("_")[1])
         for p in frames_dir.glob("frame_*.jpg") # full run
-        # for p in frames_dir.glob("frame_0528.jpg") # DEBUG
+        # for p in frames_dir.glob("frame_0530.jpg") # DEBUG
     ])
 
 
@@ -340,8 +355,8 @@ if __name__ == "__main__":
         # ==========================================================
         # for pid in traj_rasters.keys():
         for pid in future_heatmaps.keys():
-            save_file   = Path(f"../processed/PETS09/input/{iterator:04d}.npy")
-            gt_dir      = Path("../processed/PETS09/target"); gt_dir.mkdir(parents=True, exist_ok=True)
+            save_file   = Path(f"../processed/{save_name}/input/{iterator:04d}.npy")
+            gt_dir      = Path(f"../processed/{save_name}/target"); gt_dir.mkdir(parents=True, exist_ok=True)
 
             compose(
                 traj_raster   = traj_rasters[pid],
@@ -354,7 +369,7 @@ if __name__ == "__main__":
             np.save(gt_file, future_heatmaps[pid])
 
             ## also save the coordinates for later evaluation
-            coords_dir = Path("../processed/PETS09/target_coords")
+            coords_dir = Path(f"../processed/{save_name}/target_coords")
             coords_dir.mkdir(parents=True, exist_ok=True)
 
             frames_list = [f for (f, _, _) in trajectories[pid]]
@@ -363,9 +378,22 @@ if __name__ == "__main__":
 
             np.save(coords_dir / f"{iterator:04d}.npy", np.array(future_coords, dtype=np.float32))
 
+            ## save past coords for LSTM encoder
+            past_coords_dir = Path(f"../processed/{save_name}/past_coords")
+            past_coords_dir.mkdir(parents=True, exist_ok=True)
+
+            start = max(0, idx - past_steps + 1)
+            past_xy = [(x, y) for (_, x, y) in trajectories[pid][start : idx + 1]]
+            # pad with first position if fewer than past_steps frames available
+            if len(past_xy) < past_steps:
+                pad = [past_xy[0]] * (past_steps - len(past_xy))
+                past_xy = pad + past_xy
+
+            np.save(past_coords_dir / f"{iterator:04d}.npy", np.array(past_xy, dtype=np.float32))
+
             iterator += 1
     
-    obstacle_mask_file = Path("../processed/PETS09/obstacle_mask.npy")
+    obstacle_mask_file = Path(f"../processed/{save_name}/obstacle_mask.npy")
     obstacle_mask = obstacle_mask[..., None]   # (H, W, 1)
     np.save(obstacle_mask_file, obstacle_mask)
 
