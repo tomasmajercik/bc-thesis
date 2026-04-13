@@ -5,7 +5,7 @@ from training.logger import WandbLogger
 from torch.utils.data import DataLoader
 from model.model import MultiEncoderUNet
 from training.metrics import EMDMetric, KLDMetric, FDEMetric, MRMetric
-from training.datasets import PETSDataset, StMarcDataset, SherbrookeDataset, AtriumDataset, RouenDataset, MOTS16_02Dataset
+from training.datasets import PETSDataset, PETSDatasetST, StMarcDataset, SherbrookeDataset, AtriumDataset, RouenDataset, MOTS16_02Dataset
 from training.losses import DiceLoss, NonZeroDiceLoss, SparseIoULoss, SparseHeatmapLoss
 from training.utils import ConsoleColors as cc, load_params, split_ds, split_ds_w_test, split_ds_sequential, log_predictions_to_wandb
 
@@ -23,7 +23,9 @@ if __name__ == "__main__":
     use_lstm = CFG.get('use_lstm', False)
 
     if CFG['dataset'] == "pets":
-        dataset = PETSDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
+        # dataset = PETSDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
+        from training.datasets import PETS09NoGaussL
+        dataset = PETS09NoGaussL(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
     elif CFG['dataset'] == "stmarc":
         dataset = StMarcDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
     elif CFG['dataset'] == "sherbrooke":
@@ -53,11 +55,10 @@ if __name__ == "__main__":
         use_lstm          = use_lstm,
     ).to(DEVICE)
 
-
-    # from training.losses import EdgeLoss
-    # criterion = EdgeLoss().to(DEVICE)
-    from training.losses import SparseHeatmapLoss
-    criterion = SparseHeatmapLoss().to(DEVICE)
+    # from training.losses import TverskyLoss
+    # criterion = TverskyLoss(alpha=CFG['alpha'], beta=CFG['beta']).to(DEVICE)
+    from training.losses import ChamferHeatmapLoss
+    criterion = ChamferHeatmapLoss(top_k_frac=CFG['top_k_frac']).to(DEVICE)
 
     # fourier = FourierLoss().to(DEVICE)
     # edge    = EdgeLoss().to(DEVICE)

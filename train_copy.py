@@ -13,7 +13,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 if __name__ == "__main__":
     ## Config ##
-    CFG    = load_params("training/config/training_cfg.yaml")
+    CFG    = load_params("training/config/training_cfg-copy.yaml")
     logger = WandbLogger(CFG)
 
     if DEVICE == "cpu": print(cc.WARN + f"Using cpu as a device\n")
@@ -23,7 +23,9 @@ if __name__ == "__main__":
     use_lstm = CFG.get('use_lstm', False)
 
     if CFG['dataset'] == "pets":
-        dataset = PETSDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
+        # dataset = PETSDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
+        from training.datasets import PETSDatasetSW
+        dataset = PETSDatasetSW(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
     elif CFG['dataset'] == "stmarc":
         dataset = StMarcDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
     elif CFG['dataset'] == "sherbrooke":
@@ -54,8 +56,10 @@ if __name__ == "__main__":
     ).to(DEVICE)
 
 
-    from training.losses import EdgeLoss
-    criterion = EdgeLoss().to(DEVICE)
+    from training.losses import EdgeCoverageLoss
+    criterion = EdgeCoverageLoss().to(DEVICE)
+    # from training.losses import SparseHeatmapLoss
+    # criterion = SparseHeatmapLoss().to(DEVICE)
 
     # fourier = FourierLoss().to(DEVICE)
     # edge    = EdgeLoss().to(DEVICE)

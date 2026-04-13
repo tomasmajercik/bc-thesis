@@ -8,6 +8,7 @@
 #   future_traj_steps: 15               # number of future positions to predict
 #   traj_sampling_method: "gaussian"    # method for trajectory generation (linear / gaussian)
 
+
 for_input:
   local_scale: 3.0                    # scale for local crop around the person
   context_scale: 1.5                  # scale for context crop around the person
@@ -15,5 +16,6 @@ for_input:
   past_traj_steps: 21                 # number of past positions for trajectory encoding
 
 for_groundtruth:
-  future_traj_steps: 27               # number of future positions to predict
-  traj_sampling_method: "gaussian"    # method for trajectory generation (linear / gaussian)
+  save_as: "PETS09-NoGauss-L"                   # save as this name, Default: "PETS09"
+  future_traj_steps: 42               # number of future positions to predict
+  traj_sampling_method: "linear"    # method for trajectory generation (linear / gaussian)

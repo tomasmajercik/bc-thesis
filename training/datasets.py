@@ -5,10 +5,11 @@ import numpy as np
 import torch.nn.functional as F
 
 class BaseDataset(torch.utils.data.Dataset):
-    def __init__(self, root_dir="data/processed/PETS09", scale=0.5, return_coords=False, return_past_coords=False):
+    def __init__(self, root_dir="data/processed/PETS09", scale=0.5, return_coords=False, no_steps=21, return_past_coords=False):
         self.scale = scale
         self.return_coords = return_coords
         self.return_past_coords = return_past_coords
+        self.no_steps = no_steps
 
         self.input_dir = os.path.join(root_dir, "input")
         self.target_dir = os.path.join(root_dir, "target")
@@ -71,7 +72,7 @@ class BaseDataset(torch.utils.data.Dataset):
                 coords = coords * self.scale
 
             # Pad to fixed length so DataLoader can collate
-            max_steps = 30  # set to your future_steps config value
+            max_steps = self.no_steps  # set to your future_steps config value
             n = coords.shape[0]
             if n < max_steps:
                 pad = torch.full((max_steps - n, 2), -1.0)  # -1 flags invalid/missing
@@ -97,7 +98,7 @@ class BaseDataset(torch.utils.data.Dataset):
             past_coords = past_coords * self.scale
 
         # Pad to fixed length so DataLoader can collate
-        max_past_steps = 21  # must match past_traj_steps in data/scripts/configs/params.yaml
+        max_past_steps = self.no_steps  # must match past_traj_steps in data/scripts/configs/params.yaml
         n = past_coords.shape[0]
         if n < max_past_steps:
             pad = torch.full((max_past_steps - n, 2), -1.0)  # -1 flags invalid/missing
@@ -108,8 +109,34 @@ class BaseDataset(torch.utils.data.Dataset):
         return past_coords
             
 class PETSDataset(BaseDataset):
-    def __init__(self, root_dir="data/processed/PETS09", scale=0.5, return_coords=False, return_past_coords=False):
-        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, return_past_coords=return_past_coords)
+    def __init__(self, root_dir="data/processed/PETS09", scale=0.5, return_coords=False, no_steps=21, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
+
+##############################################################################################################################
+class PETSDatasetLW(BaseDataset):
+    def __init__(self, root_dir="data/processed/PETS09-LW", scale=0.5, return_coords=False, no_steps=42, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
+class PETSDatasetSW(BaseDataset):
+    def __init__(self, root_dir="data/processed/PETS09-SW", scale=0.5, return_coords=False, no_steps=21, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
+class PETSDatasetLT(BaseDataset):
+    def __init__(self, root_dir="data/processed/PETS09-LT", scale=0.5, return_coords=False, no_steps=42, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
+class PETSDatasetST(BaseDataset):
+    def __init__(self, root_dir="data/processed/PETS09-ST", scale=0.5, return_coords=False, no_steps=21, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
+##############################################################################################################################
+class PETS09NoGaussL(BaseDataset):
+    def __init__(self, root_dir="data/processed/PETS09-NoGauss-L", scale=0.5, return_coords=False, no_steps=42, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
+class PETS09NoGaussS(BaseDataset):
+    def __init__(self, root_dir="data/processed/PETS09-NoGauss-S", scale=0.5, return_coords=False, no_steps=21, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
+##############################################################################################################################
+class PETS09_Old(BaseDataset):
+    def __init__(self, root_dir="data/processed/PETS09-Old", scale=0.5, return_coords=False, no_steps=15, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
+##############################################################################################################################
 
 class StMarcDataset(BaseDataset):
     def __init__(self, root_dir="data/processed/stmarc", scale=0.5, return_coords=False, return_past_coords=False):

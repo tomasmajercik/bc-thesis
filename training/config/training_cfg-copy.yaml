@@ -2,7 +2,7 @@
 train_ratio: 0.70
 val_ratio: 0.20
 batch_size: 4
-num_epochs: 20
+num_epochs: 25
 optimizer: "adam"
 learning_rate: 5e-5
 weight_decay: 1e-4
@@ -28,8 +28,8 @@ dataset: "pets" # pets, stmarc, sherbrooke, atrium, rouen, mots16_02
 wandb:
   use_wandb: true
   project: "bc-thesis"
-  run_name: "LSTM-as-5th-EdgeLoss"
+  run_name: "SW-Edge+Coverage"
   log_interval: 1 # every N epoch
-  group: "wider-stroke-experiments" 
+  group: "length-thickness-experiments" 
 
 debug: false

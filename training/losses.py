@@ -288,6 +288,39 @@ class EdgeLoss(nn.Module):
 
         return F.mse_loss(pred_edge, target_edge)
     
+class EdgeCoverageLoss(nn.Module):
+    def __init__(self, coverage_weight=0.1, threshold=0.2):
+        super().__init__()
+        self.coverage_weight = float(coverage_weight)
+        self.threshold       = float(threshold)
+        sobel_x = torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=torch.float32)
+        sobel_y = torch.tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=torch.float32)
+        self.register_buffer('sobel_x', sobel_x.view(1, 1, 3, 3))
+        self.register_buffer('sobel_y', sobel_y.view(1, 1, 3, 3))
+
+    def forward(self, pred, target):
+        sobel_x = self.sobel_x  # type: ignore
+        sobel_y = self.sobel_y  # type: ignore
+
+        # --- Edge ---
+        pred_edge   = torch.sqrt(F.conv2d(pred,   sobel_x, padding=1) ** 2 + F.conv2d(pred,   sobel_y, padding=1) ** 2 + 1e-8)
+        target_edge = torch.sqrt(F.conv2d(target, sobel_x, padding=1) ** 2 + F.conv2d(target, sobel_y, padding=1) ** 2 + 1e-8)
+        edge = F.mse_loss(pred_edge, target_edge)
+
+        # --- Soft IoU coverage ---
+        # only penalize pred for NOT covering GT regions
+        # does not reward blobs outside GT
+        gt_mask   = (target > self.threshold).float()
+        pred_soft = pred * gt_mask          # pred values INSIDE gt region only
+        gt_soft   = target * gt_mask
+
+        intersection = (pred_soft * gt_soft).sum(dim=[1, 2, 3])
+        gt_area      = gt_soft.sum(dim=[1, 2, 3]) + 1e-8
+        coverage     = 1.0 - (intersection / gt_area).mean()  # 0 = perfect, 1 = no coverage
+
+        # print(f"Edge: {edge.item():.4f}  Coverage: {self.coverage_weight * coverage:.4f}")
+        return edge + self.coverage_weight * coverage
+    
 class EdgeSparseLoss(nn.Module): # edgeloss but should force the model to stretch the lines
     def __init__(self, edge_weight=1.0, nonzero_weight=0.5):
         super().__init__()
@@ -667,3 +700,94 @@ class EMDFourierLoss(nn.Module):
         fourier = torch.stack(fourier_vals).mean()
 
         return self.emd_weight * emd + self.fourier_weight * fourier
+    
+
+class ChamferHeatmapLoss(nn.Module):
+    """
+    Soft Chamfer loss between predicted and GT heatmaps.
+    Treats heatmaps as weighted point clouds.
+    Penalizes predictions that are blob-shaped when GT is elongated,
+    and predictions that miss the trajectory endpoints.
+    """
+    def __init__(self, top_k_frac=0.05):
+        super().__init__()
+        self.top_k_frac = top_k_frac  # fraction of pixels to treat as "active"
+
+    def forward(self, pred, target):
+        B, _, H, W = pred.shape
+        device = pred.device
+        eps = 1e-8
+        losses = []
+
+        # Pixel coordinate grid — fixed geometry, no gradients needed
+        ys = torch.arange(H, device=device).float()
+        xs = torch.arange(W, device=device).float()
+        grid_y, grid_x = torch.meshgrid(ys, xs, indexing='ij')
+        all_coords = torch.stack([grid_x.flatten(), grid_y.flatten()], dim=1)  # (N, 2)
+
+        for i in range(B):
+            p = pred[i].squeeze().flatten()    # (N,) — requires grad
+            t = target[i].squeeze().flatten()  # (N,) — no grad needed
+
+            # Soft distribution over pred pixels — gradient flows through here
+            p_norm = p / (p.sum() + eps)
+
+            # Hard-select top-k GT pixels (GT has no grad anyway)
+            k = max(1, int(self.top_k_frac * H * W))
+            _, gt_idx = torch.topk(t, k)
+            gt_pts = all_coords[gt_idx]  # (k, 2)
+
+            # Distance from every pixel to its nearest GT point: (N,)
+            # This is pure geometry — a fixed weight map, no grad needed
+            dist_to_gt = torch.cdist(all_coords, gt_pts).min(dim=1).values  # (N,)
+
+            # pred → GT: pull pred mass toward GT pixels (grad flows through p_norm)
+            loss_p2g = (p_norm * dist_to_gt).sum()
+
+            # GT → pred: expected distance from each GT point under pred distribution
+            # dist_all_to_gt.t() is (k, N): dist from each GT pt to every pred pixel
+            dist_gt_to_all = torch.cdist(gt_pts, all_coords)          # (k, N)
+            expected_dist = (dist_gt_to_all * p_norm.unsqueeze(0)).sum(dim=1)  # (k,)
+            loss_g2p = expected_dist.mean()
+
+            losses.append(loss_p2g + loss_g2p)
+
+        return torch.stack(losses).mean()
+    
+class TverskyLoss(nn.Module):
+    """
+    Tversky Loss for sparse heatmap prediction.
+    Generalizes Dice loss with asymmetric penalties for FP and FN.
+    
+    alpha: penalty for false positives (predicting trajectory where there is none)
+    beta:  penalty for false negatives (missing trajectory that exists)
+    
+    Set beta > alpha to punish missing the trajectory more than over-predicting.
+    Recommended starting point: alpha=0.3, beta=0.7
+    """
+    def __init__(self, alpha: float = 0.3, beta: float = 0.7, eps: float = 1e-8):
+        super().__init__()
+        self.alpha = alpha
+        self.beta = beta
+        self.eps = eps
+
+    def forward(self, pred, target):
+        B = pred.shape[0]
+        losses = []
+
+        for i in range(B):
+            p = pred[i].squeeze().flatten().float()
+            t = target[i].squeeze().flatten().float()
+
+            # Normalize both to [0, 1] range
+            p = p / (p.max() + self.eps)
+            t = t / (t.max() + self.eps)
+
+            tp = (p * t).sum()
+            fp = (p * (1 - t)).sum()
+            fn = ((1 - p) * t).sum()
+
+            tversky = tp / (tp + self.alpha * fp + self.beta * fn + self.eps)
+            losses.append(1 - tversky)
+
+        return torch.stack(losses).mean()
