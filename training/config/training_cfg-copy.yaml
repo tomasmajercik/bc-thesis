@@ -2,7 +2,7 @@
 train_ratio: 0.70
 val_ratio: 0.20
 batch_size: 4
-num_epochs: 25
+num_epochs: 30
 optimizer: "adam"
 learning_rate: 5e-5
 weight_decay: 1e-4
@@ -15,6 +15,9 @@ use_lstm: false # whether to use LSTM or not
 # Loss fn
 nonzero_weight: 50.0
 sparsity_weight: 1.0
+# top_k_frac: 0.05 # for ChamferHeatmapLoss
+alpha: 0.3 # for TverskyLoss
+beta: 0.7  # for TverskyLoss
 
 # Metrics
 return_coords: true
@@ -28,7 +31,7 @@ dataset: "pets" # pets, stmarc, sherbrooke, atrium, rouen, mots16_02
 wandb:
   use_wandb: true
   project: "bc-thesis"
-  run_name: "SW-Edge+Coverage"
+  run_name: "TverskyLoss"
   log_interval: 1 # every N epoch
   group: "length-thickness-experiments" 
 
