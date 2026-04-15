@@ -24,8 +24,8 @@ if __name__ == "__main__":
 
     if CFG['dataset'] == "pets":
         # dataset = PETSDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
-        from training.datasets import PETSDatasetLT
-        dataset = PETSDatasetLT(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
+        from training.datasets import PETSDatasetLW
+        dataset = PETSDatasetLW(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
     elif CFG['dataset'] == "stmarc":
         dataset = StMarcDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
     elif CFG['dataset'] == "sherbrooke":
@@ -59,6 +59,12 @@ if __name__ == "__main__":
     criterion = TverskyLoss(alpha=CFG['alpha'], beta=CFG['beta']).to(DEVICE)
     # from training.losses import ChamferHeatmapLoss
     # criterion = ChamferHeatmapLoss(top_k_frac=CFG['top_k_frac']).to(DEVICE)
+    # from training.losses import RecallWithToleranceLoss
+    # criterion = RecallWithToleranceLoss(
+    #     tolerance_px=10,
+    #     recall_weight=15.0,
+    #     precision_weight=0.3,
+    # ).to(DEVICE)
 
     # fourier = FourierLoss().to(DEVICE)
     # edge    = EdgeLoss().to(DEVICE)

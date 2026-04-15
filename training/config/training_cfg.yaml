@@ -17,7 +17,7 @@ nonzero_weight: 50.0
 sparsity_weight: 1.0
 # top_k_frac: 0.05 # for ChamferHeatmapLoss
 alpha: 0.3 # for TverskyLoss
-beta: 0.7  # for TverskyLoss
+beta: 0.8  # for TverskyLoss
 
 # Metrics
 return_coords: true
@@ -31,7 +31,7 @@ dataset: "pets" # pets, stmarc, sherbrooke, atrium, rouen, mots16_02
 wandb:
   use_wandb: true
   project: "bc-thesis"
-  run_name: "TverskyLoss"
+  run_name: "TverskyLossBalanced-LW"
   log_interval: 1 # every N epoch
   group: "length-thickness-experiments" 
 

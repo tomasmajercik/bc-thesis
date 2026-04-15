@@ -772,22 +772,92 @@ class TverskyLoss(nn.Module):
         self.eps = eps
 
     def forward(self, pred, target):
-        B = pred.shape[0]
-        losses = []
+        # Both pred and target are already in [0, 1] — no per-sample max normalization.
+        # Per-max normalization was the instability source: a short high-intensity blob
+        # and a long dim line became identical after dividing by their own maxes,
+        # destroying the FN asymmetry and causing erratic gradients early in training.
+        p = pred.flatten(1).float()
+        t = target.flatten(1).float()
 
-        for i in range(B):
-            p = pred[i].squeeze().flatten().float()
-            t = target[i].squeeze().flatten().float()
+        tp = (p * t).sum(dim=1)
+        fp = (p * (1 - t)).sum(dim=1)
+        fn = ((1 - p) * t).sum(dim=1)
 
-            # Normalize both to [0, 1] range
-            p = p / (p.max() + self.eps)
-            t = t / (t.max() + self.eps)
+        tversky = tp / (tp + self.alpha * fp + self.beta * fn + self.eps)
+        return (1 - tversky).mean()
 
-            tp = (p * t).sum()
-            fp = (p * (1 - t)).sum()
-            fn = ((1 - p) * t).sum()
 
-            tversky = tp / (tp + self.alpha * fp + self.beta * fn + self.eps)
-            losses.append(1 - tversky)
+class RecallWithToleranceLoss(nn.Module):
+    """
+    Directly solves the short-line problem by separating recall from precision
+    with asymmetric weights and spatial tolerance.
 
-        return torch.stack(losses).mean()
+    Core idea
+    ---------
+    For every GT pixel, ask: "does the prediction have *any* activation
+    within `tolerance_px` pixels of this location?"  If yes, no recall
+    penalty.  If no, heavy penalty.  Precision is penalised only for
+    predictions that are far from *every* GT pixel — so a slightly off-axis
+    but full-length line is virtually free.
+
+    Why this works where others failed
+    -----------------------------------
+    - No sparsity term  → the model is never rewarded for being short.
+    - Tolerance window  → imprecise-but-long predictions are accepted.
+    - recall_weight >> precision_weight → missing the far end of the
+      trajectory hurts far more than predicting a few extra pixels.
+    - Max-pool trick    → the tolerance is implemented in O(HW) via
+      max-pooling instead of expensive pairwise distances.
+
+    Parameters
+    ----------
+    tolerance_px    : spatial slack in pixels (GT is soft-dilated by this amount).
+                      Start with 5–7 px; increase if the trajectory is thick.
+    recall_weight   : how much missing a GT pixel costs.  >= 10 recommended.
+    precision_weight: how much predicting far outside GT costs.  Keep small
+                      (0.1–0.5) — you want imprecise predictions to be cheap.
+    threshold       : minimum GT value treated as "active" (ignores near-zero noise).
+    """
+
+    def __init__(
+        self,
+        tolerance_px: int    = 5,
+        recall_weight: float  = 15.0,
+        precision_weight: float = 0.3,
+        threshold: float     = 0.05,
+    ):
+        super().__init__()
+        self.tolerance_px     = int(tolerance_px)
+        self.recall_weight    = float(recall_weight)
+        self.precision_weight = float(precision_weight)
+        self.threshold        = float(threshold)
+
+    def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        k = 2 * self.tolerance_px + 1
+
+        # --- RECALL ---
+        # For every GT pixel, take the maximum prediction within a window.
+        # If that max >= GT value the pixel is "covered" → zero recall penalty.
+        pred_dilated = F.max_pool2d(
+            pred,
+            kernel_size=k,
+            stride=1,
+            padding=self.tolerance_px,
+        )  # each location holds the max pred in its neighbourhood
+
+        gt_mask     = (target > self.threshold).float()
+        # relu: only penalise when gt > pred_dilated (missed GT, not over-predicted)
+        recall_loss = (gt_mask * F.relu(target - pred_dilated)).mean()
+
+        # --- PRECISION ---
+        # Only penalise predictions that are far from any GT pixel.
+        gt_dilated    = F.max_pool2d(
+            gt_mask,
+            kernel_size=k,
+            stride=1,
+            padding=self.tolerance_px,
+        )
+        outside_zone   = 1.0 - gt_dilated           # 1 = far from any GT pixel
+        precision_loss = (pred * outside_zone).pow(2).mean()
+
+        return self.recall_weight * recall_loss + self.precision_weight * precision_loss
