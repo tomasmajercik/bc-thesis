@@ -34,15 +34,15 @@ def _load_dataset(CFG):
     )
     ds_name = CFG['dataset']
     if ds_name == "pets":
-        return PETSDatasetST(**kwargs)
+        return PETSDatasetST(**kwargs) #type: ignore
     elif ds_name == "stmarc":
-        return StMarcDataset(**kwargs)
+        return StMarcDataset(**kwargs) #type: ignore
     elif ds_name == "sherbrooke":
-        return SherbrookeDataset(**kwargs)
+        return SherbrookeDataset(**kwargs) #type: ignore
     elif ds_name == "atrium":
-        return AtriumDataset(**kwargs)
+        return AtriumDataset(**kwargs) #type: ignore
     elif ds_name == "rouen":
-        return RouenDataset(**kwargs)
+        return RouenDataset(**kwargs) #type: ignore
     elif ds_name == "mots16_02":
         return MOTS16_02Dataset(scale=(CFG['image_scale'] - 0.15), return_coords=True, return_past_coords=use_lstm)
     else:

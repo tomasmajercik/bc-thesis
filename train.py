@@ -20,22 +20,22 @@ if __name__ == "__main__":
     else: print(cc.INFO + f"Using gpu as a device\n")
 
     ## Load dataset
-    use_lstm = CFG.get('use_lstm', False)
+    use_motion = CFG.get('use_motion', False)
 
     if CFG['dataset'] == "pets":
-        # dataset = PETSDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
-        from training.datasets import PETSDatasetLW
-        dataset = PETSDatasetLW(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
+        # dataset = PETSDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_motion)
+        from training.datasets import PETSDatasetLT
+        dataset = PETSDatasetLT(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_motion)
     elif CFG['dataset'] == "stmarc":
-        dataset = StMarcDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
+        dataset = StMarcDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_motion)
     elif CFG['dataset'] == "sherbrooke":
-        dataset = SherbrookeDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
+        dataset = SherbrookeDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_motion)
     elif CFG['dataset'] == "atrium":
-        dataset = AtriumDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
+        dataset = AtriumDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_motion)
     elif CFG['dataset'] == "rouen":
-        dataset = RouenDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
+        dataset = RouenDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_motion)
     elif CFG['dataset'] == "mots16_02":
-        dataset = MOTS16_02Dataset(scale=(CFG['image_scale'] - 0.15), return_coords=CFG['return_coords'], return_past_coords=use_lstm)
+        dataset = MOTS16_02Dataset(scale=(CFG['image_scale'] - 0.15), return_coords=CFG['return_coords'], return_past_coords=use_motion)
 
     if CFG['debug']: dataset = torch.utils.data.Subset(dataset, range(20))
 
@@ -52,19 +52,12 @@ if __name__ == "__main__":
         context_channels  = 3,
         zoom_channels     = 3,
         width             = CFG['model_size'],
-        use_lstm          = use_lstm,
+        use_motion        = use_motion,
     ).to(DEVICE)
 
     from training.losses import TverskyLoss
     criterion = TverskyLoss(alpha=CFG['alpha'], beta=CFG['beta']).to(DEVICE)
-    # from training.losses import ChamferHeatmapLoss
-    # criterion = ChamferHeatmapLoss(top_k_frac=CFG['top_k_frac']).to(DEVICE)
-    # from training.losses import RecallWithToleranceLoss
-    # criterion = RecallWithToleranceLoss(
-    #     tolerance_px=10,
-    #     recall_weight=15.0,
-    #     precision_weight=0.3,
-    # ).to(DEVICE)
+
 
     # fourier = FourierLoss().to(DEVICE)
     # edge    = EdgeLoss().to(DEVICE)
@@ -102,7 +95,7 @@ if __name__ == "__main__":
         train_loss = 0
 
         for batch in train_loader:
-            if use_lstm:
+            if use_motion:
                 past, imp, ctx, zoom, target, _, past_coords = [x.to(DEVICE) for x in batch]
                 model_out = model(past, imp, ctx, torch.zeros_like(zoom), past_coords)
             else:
@@ -126,7 +119,7 @@ if __name__ == "__main__":
 
         with torch.no_grad():
             for batch in val_loader:
-                if use_lstm:
+                if use_motion:
                     past, imp, ctx, zoom, target, coords, past_coords = [x.to(DEVICE) for x in batch]
                     model_out = model(past, imp, ctx, torch.zeros_like(zoom), past_coords)
                 else:
@@ -206,7 +199,7 @@ if __name__ == "__main__":
 
     with torch.no_grad():
         for batch in test_loader:
-            if use_lstm:
+            if use_motion:
                 past, imp, ctx, zoom, target, coords, past_coords = [x.to(DEVICE) for x in batch]
                 model_out = model(past, imp, ctx, torch.zeros_like(zoom), past_coords)
             else:

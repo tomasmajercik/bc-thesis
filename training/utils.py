@@ -71,7 +71,7 @@ def log_predictions_to_wandb(model, val_loader, epoch, device, num_samples=3, fi
     past, imp, ctx, zoom, target = [x.to(device) for x in batch[:5]]
 
     with torch.no_grad():
-        if model.use_lstm:
+        if model.use_motion:
             past_coords = batch[6].to(device)
             pred = model(past, imp, ctx, torch.zeros_like(zoom), past_coords)
         else:

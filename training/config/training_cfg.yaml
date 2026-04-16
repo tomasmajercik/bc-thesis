@@ -10,7 +10,7 @@ image_scale: 0.5   # 1.0 = full, 0.5 = half size
 
 # Model
 model_size: 1 # 0.5 = small, 1 = base, 2 = large, etc.
-use_lstm: false # whether to use LSTM or not
+use_motion: true # whether to use motion features (LSTM encoder)
 
 # Loss fn
 nonzero_weight: 50.0
@@ -29,10 +29,10 @@ eps: 1e-8
 dataset: "pets" # pets, stmarc, sherbrooke, atrium, rouen, mots16_02
 
 wandb:
-  use_wandb: true
+  use_wandb: false
   project: "bc-thesis"
-  run_name: "TverskyLossBalanced-LW"
+  run_name: "[LSTM+pastEncoder]TverskyLossBalanced"
   log_interval: 1 # every N epoch
   group: "length-thickness-experiments" 
 
-debug: false
+debug: true
