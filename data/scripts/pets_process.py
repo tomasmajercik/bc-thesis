@@ -67,7 +67,7 @@ def rasterize_past_traj(
     height,
     width,
     traj_method,
-    radius=2,
+    radius=5,
     min_intensity=50,
     max_intensity=255,
 ):
@@ -169,9 +169,9 @@ def rasterize_future_traj(traj, frame_id, future_steps, height, width, method):
         if not (0 <= px < width and 0 <= py < height):
             continue
 
-        sigma = 2.0 + 3.0 * (i / max(1, n - 1))          # later → wider (old)
+        sigma = 7.0 + 1.0 * (i / max(1, n - 1))          # later → wider (old)
         # sigma = 12.0 + 5.0 * (i / max(1, n - 1)) # 🚨 experiment with wider
-        amp   = np.exp(-1.5 * i / max(1, n - 1))        # later → weaker
+        amp   = np.exp(-0.25 * i / max(1, n - 1))
 
         ksize = int(6 * sigma + 1) | 1
 
@@ -181,7 +181,7 @@ def rasterize_future_traj(traj, frame_id, future_steps, height, width, method):
 
         heatmap += tmp
 
-    heatmap = cv2.GaussianBlur(heatmap, (0, 0), sigmaX=2.0) # type: ignore
+    heatmap = cv2.GaussianBlur(heatmap, (0, 0), sigmaX=3.0) # type: ignore
 
     # --- normalize to [0,255] ---
     heatmap /= (heatmap.max() + 1e-8)
@@ -254,7 +254,7 @@ def zoom_n_crop(frame, anchor_point, scale):
     return cv2.resize(cropped_part, (W, H), interpolation=cv2.INTER_LINEAR)
 
 if __name__ == "__main__":
-    INPUT_CFG, GT_CFG = load_params("configs/old_params.yaml")
+    INPUT_CFG, GT_CFG = load_params("configs/params-pets09.yaml")
 
     save_name   = GT_CFG.get("save_as", "PETS09")
     frames_dir  = Path("../raw/PETS09/frames")
@@ -274,8 +274,8 @@ if __name__ == "__main__":
     iterator = 0
     frame_ids = sorted([
         int(p.stem.split("_")[1])
-        for p in frames_dir.glob("frame_*.jpg") # full run
-        # for p in frames_dir.glob("frame_0530.jpg") # DEBUG
+        # for p in frames_dir.glob("frame_*.jpg") # full run
+        for p in frames_dir.glob("frame_0440.jpg") # DEBUG
     ])
 
 

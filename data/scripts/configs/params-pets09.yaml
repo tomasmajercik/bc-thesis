@@ -1,0 +1,11 @@
+# pets09 dataset preprocessingparameters
+for_input:
+  local_scale: 3.0 
+  context_scale: 1.5 
+  traj_sampling_method: "linear" 
+  past_traj_steps: 21
+
+for_groundtruth:
+  save_as: "PETS09-Balanced"
+  future_traj_steps: 35             # 5sec = 7FPS * 5sec = 35 steps
+  traj_sampling_method: "gaussian" 

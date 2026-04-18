@@ -53,7 +53,7 @@ def decompose(original_frame_id, processed_id):
     - channel 6: past_trajectory
     """
     # Define paths
-    base_path = Path(__file__).parent.parent.parent / "processed/PETS09-NoGauss-S"
+    base_path = Path(__file__).parent.parent.parent / "processed/Mot16-Balanced"
     raw_path  = Path(__file__).parent.parent.parent / "raw/PETS09"
     save_dir  = Path(__file__).parent.parent.parent / "unglued" / f"{processed_id}"
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -76,8 +76,8 @@ def decompose(original_frame_id, processed_id):
     future_heatmap = np.load(target_file) if target_file.exists() else None
 
     # Load original frame for anchor verification
-    frame_file = raw_path / "frames" / f"frame_{original_frame_id}.jpg"
-    original_frame = cv2.imread(str(frame_file))
+    # frame_file = raw_path / "frames" / f"frame_{original_frame_id}.jpg"
+    # original_frame = cv2.imread(str(frame_file))
 
     # --- SAVE VISUALIZATIONS ---
     # Local Zoom (Scale 2.0, same pixel coordinates for anchor)
@@ -110,9 +110,13 @@ def decompose(original_frame_id, processed_id):
 
 if __name__ == "__main__":
     decompose(
-        original_frame_id="0530",   # original photo
-        processed_id="0001",        # processed input
+        original_frame_id="000150",   # original photo
+        processed_id="0000",        # processed input
     )
+    # decompose(
+    #     original_frame_id="00000355",   # original photo
+    #     processed_id="0001",        # processed input
+    # )
     # decompose(
     #     original_frame_id="0528",   # original photo
     #     processed_id="2001",        # processed input
