@@ -5,9 +5,8 @@ from training.logger import WandbLogger
 from torch.utils.data import DataLoader
 from model.model import MultiEncoderUNet
 from training.metrics import EMDMetric, KLDMetric, FDEMetric, MRMetric
-from training.datasets import PETSDataset, PETSDatasetST, StMarcDataset, SherbrookeDataset, AtriumDataset, RouenDataset, MOTS16_02Dataset
-from training.losses import DiceLoss, NonZeroDiceLoss, SparseIoULoss, SparseHeatmapLoss
 from training.utils import ConsoleColors as cc, load_params, split_ds, split_ds_w_test, split_ds_sequential, log_predictions_to_wandb
+from training.datasets import PETSDataset, PETSDatasetST, StMarcDataset, SherbrookeDataset, AtriumDataset, RouenDataset, MOTS16_02Dataset, PETS09NoGauss5sec
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -24,8 +23,9 @@ if __name__ == "__main__":
 
     if CFG['dataset'] == "pets":
         # dataset = PETSDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_motion)
-        from training.datasets import PETSDatasetLT
-        dataset = PETSDatasetLT(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_motion)
+        # from training.datasets import PETSDatasetLT
+        from training.datasets import PETS09NoGauss5sec
+        dataset = PETS09NoGauss5sec(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_motion)
     elif CFG['dataset'] == "stmarc":
         dataset = StMarcDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_motion)
     elif CFG['dataset'] == "sherbrooke":
@@ -57,12 +57,6 @@ if __name__ == "__main__":
 
     from training.losses import TverskyLoss
     criterion = TverskyLoss(alpha=CFG['alpha'], beta=CFG['beta']).to(DEVICE)
-
-
-    # fourier = FourierLoss().to(DEVICE)
-    # edge    = EdgeLoss().to(DEVICE)
-    # sparse   = SparseHeatmapLoss().to(DEVICE)
-    # emd     = EMDLoss().to(DEVICE)
 
     optimizer = optim.Adam(model.parameters(), lr=float(CFG['learning_rate']), weight_decay=float(CFG['weight_decay']))
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -97,10 +91,10 @@ if __name__ == "__main__":
         for batch in train_loader:
             if use_motion:
                 past, imp, ctx, zoom, target, _, past_coords = [x.to(DEVICE) for x in batch]
-                model_out = model(past, imp, ctx, torch.zeros_like(zoom), past_coords)
+                model_out = model(past, imp, ctx, zoom, past_coords)
             else:
                 past, imp, ctx, zoom, target, _ = [x.to(DEVICE) for x in batch]
-                model_out = model(past, imp, ctx, torch.zeros_like(zoom))
+                model_out = model(past, imp, ctx, zoom)
 
             optimizer.zero_grad()
             loss = criterion(model_out, target.float())
@@ -121,10 +115,10 @@ if __name__ == "__main__":
             for batch in val_loader:
                 if use_motion:
                     past, imp, ctx, zoom, target, coords, past_coords = [x.to(DEVICE) for x in batch]
-                    model_out = model(past, imp, ctx, torch.zeros_like(zoom), past_coords)
+                    model_out = model(past, imp, ctx, zoom, past_coords)
                 else:
                     past, imp, ctx, zoom, target, coords = [x.to(DEVICE) for x in batch]
-                    model_out = model(past, imp, ctx, torch.zeros_like(zoom))
+                    model_out = model(past, imp, ctx, zoom)
                 loss = criterion(model_out, target.float())
 
                 val_loss += loss.item()
@@ -201,10 +195,10 @@ if __name__ == "__main__":
         for batch in test_loader:
             if use_motion:
                 past, imp, ctx, zoom, target, coords, past_coords = [x.to(DEVICE) for x in batch]
-                model_out = model(past, imp, ctx, torch.zeros_like(zoom), past_coords)
+                model_out = model(past, imp, ctx, zoom, past_coords)
             else:
                 past, imp, ctx, zoom, target, coords = [x.to(DEVICE) for x in batch]
-                model_out = model(past, imp, ctx, torch.zeros_like(zoom))
+                model_out = model(past, imp, ctx, zoom)
             loss = criterion(model_out, target.float())
 
             test_loss += loss.item()

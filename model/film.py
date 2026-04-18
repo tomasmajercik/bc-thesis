@@ -8,8 +8,13 @@ class FiLM(nn.Module):
         self.projections = nn.ModuleList()
         for level in encoder_channels:          # interaters through levels (f1, f2, f3)
             level_projs = nn.ModuleList()
-            for C in level:                     # iterate encoders within level
-                level_projs.append(nn.Linear(hidden_size, 2 * C)) # 2*c to produce both, gamma and beta
+            for C in level:
+                proj = nn.Linear(hidden_size, 2 * C)
+                nn.init.zeros_(proj.weight)
+                nn.init.constant_(proj.bias, 0.0)
+                proj.bias.data[:C] = 1.0   # gamma starts at 1 (identity)
+                # proj.bias.data[C:] stays 0  # beta starts at 0 (no shift)
+                level_projs.append(proj)
             self.projections.append(level_projs)
 
     def forward(self, h, encoder_features):
@@ -36,5 +41,15 @@ class FiLM(nn.Module):
         
         return modulated
 
+if __name__ == "__main__":
+    import torch
+    film = FiLM(hidden_size=256, encoder_channels=[[64, 32], [128, 64]])
+    h = torch.randn(2, 256)  # random h
+    feat = torch.randn(2, 64, 32, 32)  # random feature map
+    features = [[feat, torch.randn(2, 32, 32, 32)], 
+                [torch.randn(2, 128, 16, 16), torch.randn(2, 64, 16, 16)]]
+    out = film(h, features)
+    diff = (out[0][0] - feat).abs().max()
+    print(f"Max diff from identity at init: {diff.item()}")  # should be ~0.0
 
         

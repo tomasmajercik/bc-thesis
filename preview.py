@@ -8,7 +8,7 @@ from model.model import MultiEncoderUNet
 from training.utils import load_params, split_ds_sequential
 from training.datasets import (
     PETSDataset, PETSDatasetLT, PETSDatasetST, PETSDatasetLW, PETSDatasetSW,
-    StMarcDataset, SherbrookeDataset, AtriumDataset, RouenDataset, MOTS16_02Dataset,
+    StMarcDataset, SherbrookeDataset, AtriumDataset, RouenDataset, MOTS16_02Dataset, PETS09NoGauss5sec
 )
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -26,15 +26,17 @@ def _overlay(ax, heatmap, color_rgb, label, alpha_scale=1.0):
 
 
 def _load_dataset(CFG):
-    use_lstm = CFG.get('use_lstm', False)
+    use_motion = CFG.get('use_motion', False)
     kwargs = dict(
         scale=CFG['image_scale'],
         return_coords=True,
-        return_past_coords=use_lstm,
+        return_past_coords=use_motion,
     )
     ds_name = CFG['dataset']
+    # ds_name = "rouen" # DEBUG
     if ds_name == "pets":
-        return PETSDatasetST(**kwargs) #type: ignore
+        return PETSDatasetLT(**kwargs) #type: ignore
+        # return PETS09NoGauss5sec(**kwargs) #type: ignore
     elif ds_name == "stmarc":
         return StMarcDataset(**kwargs) #type: ignore
     elif ds_name == "sherbrooke":
@@ -44,7 +46,7 @@ def _load_dataset(CFG):
     elif ds_name == "rouen":
         return RouenDataset(**kwargs) #type: ignore
     elif ds_name == "mots16_02":
-        return MOTS16_02Dataset(scale=(CFG['image_scale'] - 0.15), return_coords=True, return_past_coords=use_lstm)
+        return MOTS16_02Dataset(scale=(CFG['image_scale'] - 0.15), return_coords=True, return_past_coords=use_motion)
     else:
         raise ValueError(f"Unknown dataset: {ds_name!r}")
 
@@ -64,7 +66,7 @@ def preview(
       - Red   : model prediction
     """
     CFG      = load_params(config_path)
-    use_lstm = CFG.get('use_lstm', False)
+    use_motion = CFG.get('use_motion', False)
 
     # ── Dataset ──────────────────────────────────────────────────────────────
     dataset = _load_dataset(CFG)
@@ -78,7 +80,7 @@ def preview(
         context_channels  = 3,
         zoom_channels     = 3,
         width             = CFG['model_size'],
-        use_lstm          = use_lstm,
+        use_motion          = use_motion,
     ).to(DEVICE)
 
     ckpt_path = Path("checkpoints") / checkpoint_name / "best_model.pth"
@@ -98,7 +100,7 @@ def preview(
             if saved >= num_images:
                 break
 
-            if use_lstm:
+            if use_motion:
                 past, imp, ctx, zoom, target, coords, past_coords = [x.to(DEVICE) for x in batch]
                 pred = model(past, imp, ctx, torch.zeros_like(zoom), past_coords)
             else:
@@ -134,4 +136,4 @@ def preview(
 
 
 if __name__ == "__main__":
-    preview("TverskyLossBalanced-ST", num_images=30)
+    preview("TverskyLossBalanced", num_images=30)
