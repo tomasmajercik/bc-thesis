@@ -239,8 +239,8 @@ if __name__ == "__main__":
     iterator = 0
     frame_ids = sorted([
         int(p.stem)
-        # for p in frames_dir.glob("*.jpg")
-        for p in frames_dir.glob("00001500.jpg") # DEBUG
+        for p in frames_dir.glob("*.jpg")
+        # for p in frames_dir.glob("00001500.jpg") # DEBUG
     ])
 
     trajectories = load_past_traj(db_path)

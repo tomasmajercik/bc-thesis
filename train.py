@@ -5,14 +5,19 @@ from training.logger import WandbLogger
 from torch.utils.data import DataLoader
 from model.model import MultiEncoderUNet
 from training.metrics import EMDMetric, KLDMetric, FDEMetric, MRMetric
-from training.utils import ConsoleColors as cc, load_params, split_ds, split_ds_w_test, split_ds_sequential, log_predictions_to_wandb
-from training.datasets import PETSDataset, PETSDatasetST, StMarcDataset, SherbrookeDataset, AtriumDataset, RouenDataset, MOTS16_02Dataset, PETS09NoGauss5sec
+from training.utils import ConsoleColors as cc, load_params, split_ds_sequential, log_predictions_to_wandb
+from training.datasets import PetsDataset, RouenDataset, AtriumDataset, SherbrookeDataset, StMarcDataset, MotDataset
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 if __name__ == "__main__":
     ## Config ##
-    CFG    = load_params("training/config/training_cfg.yaml")
+    CFG    = load_params("training/config/stmarc-training.yaml")
+    CFG    = load_params("training/config/pets-training.yaml")
+    # CFG    = load_params("training/config/rouen-training.yaml")
+    # CFG    = load_params("training/config/sherbrooke-training.yaml")
+    # CFG    = load_params("training/config/atrium-training.yaml")
+    # CFG    = load_params("training/config/mots16_02-training.yaml")
     logger = WandbLogger(CFG)
 
     if DEVICE == "cpu": print(cc.WARN + f"Using cpu as a device\n")
@@ -22,10 +27,7 @@ if __name__ == "__main__":
     use_motion = CFG.get('use_motion', False)
 
     if CFG['dataset'] == "pets":
-        # dataset = PETSDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_motion)
-        # from training.datasets import PETSDatasetLT
-        from training.datasets import PETS09NoGauss5sec
-        dataset = PETS09NoGauss5sec(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_motion)
+        dataset = PetsDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_motion)
     elif CFG['dataset'] == "stmarc":
         dataset = StMarcDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_motion)
     elif CFG['dataset'] == "sherbrooke":
@@ -35,7 +37,7 @@ if __name__ == "__main__":
     elif CFG['dataset'] == "rouen":
         dataset = RouenDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_motion)
     elif CFG['dataset'] == "mots16_02":
-        dataset = MOTS16_02Dataset(scale=(CFG['image_scale'] - 0.15), return_coords=CFG['return_coords'], return_past_coords=use_motion)
+        dataset = MotDataset(scale=(CFG['image_scale'] - 0.15), return_coords=CFG['return_coords'], return_past_coords=use_motion)
 
     if CFG['debug']: dataset = torch.utils.data.Subset(dataset, range(20))
 

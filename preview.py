@@ -6,10 +6,7 @@ from torch.utils.data import DataLoader
 
 from model.model import MultiEncoderUNet
 from training.utils import load_params, split_ds_sequential
-from training.datasets import (
-    PETSDataset, PETSDatasetLT, PETSDatasetST, PETSDatasetLW, PETSDatasetSW,
-    StMarcDataset, SherbrookeDataset, AtriumDataset, RouenDataset, MOTS16_02Dataset, PETS09NoGauss5sec
-)
+from training.datasets import PetsDataset, RouenDataset, AtriumDataset, SherbrookeDataset, StMarcDataset, MotDataset
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -25,18 +22,17 @@ def _overlay(ax, heatmap, color_rgb, label, alpha_scale=1.0):
     ax.imshow(rgba, interpolation='bilinear')
 
 
-def _load_dataset(CFG):
+def _load_dataset(CFG, dataset_name):
     use_motion = CFG.get('use_motion', False)
     kwargs = dict(
         scale=CFG['image_scale'],
         return_coords=True,
         return_past_coords=use_motion,
     )
-    ds_name = CFG['dataset']
-    # ds_name = "rouen" # DEBUG
+    ds_name = dataset_name
     if ds_name == "pets":
-        return PETSDatasetLT(**kwargs) #type: ignore
-        # return PETS09NoGauss5sec(**kwargs) #type: ignore
+        # return PetsDataset(**kwargs) #type: ignore
+        return PetsDataset(**kwargs) #type: ignore
     elif ds_name == "stmarc":
         return StMarcDataset(**kwargs) #type: ignore
     elif ds_name == "sherbrooke":
@@ -46,13 +42,14 @@ def _load_dataset(CFG):
     elif ds_name == "rouen":
         return RouenDataset(**kwargs) #type: ignore
     elif ds_name == "mots16_02":
-        return MOTS16_02Dataset(scale=(CFG['image_scale'] - 0.15), return_coords=True, return_past_coords=use_motion)
+        return MotDataset(scale=(CFG['image_scale'] - 0.15), return_coords=True, return_past_coords=use_motion)
     else:
         raise ValueError(f"Unknown dataset: {ds_name!r}")
 
 
 def preview(
     checkpoint_name: str,
+    dataset_name: str,
     num_images: int = 30,
     config_path: str = "training/config/training_cfg.yaml",
 ):
@@ -69,7 +66,7 @@ def preview(
     use_motion = CFG.get('use_motion', False)
 
     # ── Dataset ──────────────────────────────────────────────────────────────
-    dataset = _load_dataset(CFG)
+    dataset = _load_dataset(CFG, dataset_name)
     _, val_ds, _ = split_ds_sequential(dataset, CFG['train_ratio'], CFG['val_ratio'])
     val_loader   = DataLoader(val_ds, batch_size=1, shuffle=False)
 
@@ -136,4 +133,4 @@ def preview(
 
 
 if __name__ == "__main__":
-    preview("TverskyLossBalanced", num_images=30)
+    preview("pets-balanced", dataset_name="pets", num_images=30)
