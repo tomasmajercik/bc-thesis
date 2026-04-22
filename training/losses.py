@@ -765,7 +765,7 @@ class TverskyLoss(nn.Module):
     Set beta > alpha to punish missing the trajectory more than over-predicting.
     Recommended starting point: alpha=0.3, beta=0.7
     """
-    def __init__(self, alpha: float = 0.3, beta: float = 0.7, eps: float = 1e-8):
+    def __init__(self, alpha: float = 0.3, beta: float = 0.8, eps: float = 1e-8):
         super().__init__()
         self.alpha = alpha
         self.beta = beta

@@ -3,150 +3,7 @@ import torch
 import numpy as np
 import torch.nn as nn
 
-
-# ==============================================================================
-# Base classes (Option A: unified signature with optional coords)
-# ==============================================================================
-
-class HeatmapMetric(nn.Module):
-    """
-    Base class for metrics that operate on heatmap tensors only.
-    forward(pred, target, coords=None) — coords ignored.
-    """
-    def forward(self, pred, target, coords=None):
-        raise NotImplementedError
-
-
-class CoordMetric(nn.Module):
-    """
-    Base class for metrics that require raw GT coordinates.
-    forward(pred, target, coords) — target heatmap may be ignored.
-    coords: (B, future_steps, 2) float tensor of GT pixel positions (x, y).
-    """
-    def forward(self, pred, target, coords):
-        raise NotImplementedError
-
-
-# ==============================================================================
-# Heatmap metrics
-# ==============================================================================
-
-class EMDMetric(HeatmapMetric):
-    """
-    Earth Mover's Distance (Wasserstein-1) between predicted and GT heatmaps.
-    Both maps are normalized to sum to 1 before comparison.
-    Uses the 1D sliced approximation over flattened maps for efficiency.
-
-    Cited: Bylinskii et al., "What Do Different Evaluation Metrics Tell Us
-    About Saliency Models?", IEEE TPAMI 2019.
-    """
-    def forward(self, pred, target, coords=None):
-        B = pred.shape[0]
-        emd_vals = []
-
-        for i in range(B):
-            p = pred[i].flatten().float()
-            t = target[i].flatten().float()
-
-            # Normalize to valid distributions
-            p = p / (p.sum() + 1e-8)
-            t = t / (t.sum() + 1e-8)
-
-            # Wasserstein-1 via CDF difference on sorted 1D projection
-            p_cdf = torch.cumsum(p, dim=0)
-            t_cdf = torch.cumsum(t, dim=0)
-
-            emd_vals.append(torch.abs(p_cdf - t_cdf).mean())
-
-        return torch.stack(emd_vals).mean()
-
-
-class KLDMetric(HeatmapMetric):
-    """
-    KL Divergence KL(GT || pred) between predicted and GT heatmaps.
-    Both maps normalized to sum to 1. Epsilon smoothing avoids log(0).
-    Convention KL(GT||pred): penalizes pred for missing GT mass.
-
-    Cited: Bylinskii et al., "What Do Different Evaluation Metrics Tell Us
-    About Saliency Models?", IEEE TPAMI 2019.
-    """
-    def __init__(self, eps=1e-8):
-        super().__init__()
-        self.eps = eps
-
-    def forward(self, pred, target, coords=None):
-        B = pred.shape[0]
-        kld_vals = []
-
-        for i in range(B):
-            p = pred[i].flatten().float()
-            t = target[i].flatten().float()
-
-            p = p / (p.sum() + self.eps)
-            t = t / (t.sum() + self.eps)
-
-            # Smooth to avoid log(0)
-            p = p + self.eps
-            t = t + self.eps
-
-            kld = (t * torch.log(t / p)).sum()
-            kld_vals.append(kld)
-
-        return torch.stack(kld_vals).mean()
-
-
-class NSSMetric(CoordMetric):
-    """
-    Normalized Scanpath Saliency (NSS).
-    Measures the mean normalized predicted saliency at GT fixation locations.
-    Higher = better. NSS=0 means prediction is at chance.
-
-    GT coords are used as fixation points (no thresholding needed).
-
-    Cited: Peters et al., "Components of bottom-up gaze allocation in natural
-    images", Vision Research 2005. Used in saliency benchmarks by
-    Bylinskii et al., IEEE TPAMI 2019.
-    """
-    def forward(self, pred, target, coords):
-        """
-        coords: (B, future_steps, 2) — pixel positions (x, y) in heatmap space
-        """
-        B = pred.shape[0]
-        H = pred.shape[-2]
-        W = pred.shape[-1]
-        nss_vals = []
-
-        for i in range(B):
-            p = pred[i].squeeze().float()           # (H, W)
-
-            # Normalize prediction: zero mean, unit std
-            p_norm = (p - p.mean()) / (p.std() + 1e-8)
-
-            # Collect NSS values at each GT fixation point
-            sample_coords = coords[i]               # (future_steps, 2)
-            scores = []
-
-            for (cx, cy) in sample_coords:
-                px = int(cx.item())
-                py = int(cy.item())
-
-                # Skip out-of-bounds coords
-                if 0 <= px < W and 0 <= py < H:
-                    scores.append(p_norm[py, px])
-
-            if len(scores) == 0:
-                nss_vals.append(torch.tensor(0.0, device=pred.device))
-            else:
-                nss_vals.append(torch.stack(scores).mean())
-
-        return torch.stack(nss_vals).mean()
-
-
-# ==============================================================================
-# Coordinate metrics
-# ==============================================================================
-
-class FDEMetric(CoordMetric):
+class FDEMetric():
     """
     Final Displacement Error (FDE).
     Euclidean distance between the predicted endpoint (argmax of heatmap)
@@ -154,6 +11,10 @@ class FDEMetric(CoordMetric):
 
     Cited: Gupta et al., "Social GAN", CVPR 2018.
     Gilles et al., "THOMAS", ICLR 2022 (heatmap-adapted FDE).
+
+    Dummy definition:  How far off is your predicted endpoint?" You predict where the pedestrian will end up. 
+                       GT says where they actually ended up. FDE measures the pixel distance between 
+                       those two points. Small = you found the right spot
     """
     def forward(self, pred, target, coords):
         """
@@ -180,7 +41,7 @@ class FDEMetric(CoordMetric):
         return torch.stack(fde_vals).mean()
 
 
-class MRMetric(CoordMetric):
+class MRMetric():
     """
     Miss Rate (MR).
     Fraction of samples where the predicted endpoint (argmax of heatmap)
@@ -193,6 +54,10 @@ class MRMetric(CoordMetric):
     Cited: Ettinger et al., "Large Scale Interactive Motion Forecasting
     for Autonomous Driving", ICCV 2021.
     Gilles et al., "GOHOME", ICRA 2022.
+
+    Dummy definition:   "How often do you completely miss?" Same as FDE but binary — either 
+                        you're close enough (within 20px) or you missed. MR is the percentage 
+                        of complete misses. 0% = never miss, 100% = always miss.
     """
     def __init__(self, threshold_px: float = 20.0):
         super().__init__()
@@ -220,98 +85,164 @@ class MRMetric(CoordMetric):
 
         return torch.stack(misses).mean()
 
-class NLLMetric(HeatmapMetric):
+class NearestGTPixelMetric():
     """
-    Negative Log-Likelihood of GT final position under predicted heatmap distribution.
-    Heatmap is normalized to sum to 1 (treated as discrete probability distribution).
-    Lower = better. Penalizes confident wrong predictions heavily.
-    
-    Rewards models that assign probability mass near the true future position,
-    even if the prediction is uncertain/spread out.
-    """
-    def __init__(self, eps=1e-8):
-        super().__init__()
-        self.eps = eps
+    Nearest GT Pixel Distance (NGP).
+    Euclidean distance between the predicted endpoint (argmax of heatmap)
+    and the nearest non-zero pixel in the ground truth raster.
+    Unlike FDE which measures distance to the final GT point only,
+    NGP rewards predictions that are close to ANY part of the future
+    trajectory — better suited for blob-shaped spatial predictions.
+    Lower = better.
+    Cited: Inspired by endpoint-to-path distance evaluation in:
+    Mangalam et al., "It Is Not the Journey but the Destination",
+    ECCV 2020.
 
+    Dummy definition:   "How far are you from any part of the correct path?" Instead of only checking the endpoint, 
+                        this checks if your prediction lands anywhere near the GT trajectory. If the pedestrian walked 
+                        a long path and you predicted a shorter one but in the right direction, NGP rewards you. 
+                        FDE would punish you. Better suited for your blob predictions.
+    """
     def forward(self, pred, target, coords):
         """
-        coords: (B, future_steps, 2) — last entry is the final GT position
+        pred:   (B, 1, H, W) — model output
+        target: (B, 1, H, W) — GT raster
+        coords: not used, kept for consistent interface
         """
         B = pred.shape[0]
-        H = pred.shape[-2]
         W = pred.shape[-1]
-        nll_vals = []
-
+        ngp_vals = []
         for i in range(B):
-            p = pred[i].squeeze().float()           # (H, W)
+            p = pred[i].squeeze().float()
+            t = target[i].squeeze().float()
 
-            # Normalize to valid probability distribution
-            p = p / (p.sum() + self.eps)
+            # Predicted endpoint
+            flat_idx = p.argmax()
+            pred_y = (flat_idx // W).float()
+            pred_x = (flat_idx  % W).float()
 
-            # GT final position
-            gt_x = int(coords[i, -1, 0].item())
-            gt_y = int(coords[i, -1, 1].item())
+            # All non-zero GT pixels
+            gt_pixels = (t > 0.01).nonzero(as_tuple=False).float()  # (N, 2) as (y, x)
+            if gt_pixels.shape[0] == 0:
+                continue
 
-            # Clamp to valid range
-            gt_x = max(0, min(gt_x, W - 1))
-            gt_y = max(0, min(gt_y, H - 1))
+            gt_yx = gt_pixels  # (N, 2)
+            pred_yx = torch.tensor([pred_y, pred_x], device=p.device).float()
+            dists = torch.sqrt(((gt_yx - pred_yx) ** 2).sum(dim=1))
+            ngp_vals.append(dists.min())
 
-            prob = p[gt_y, gt_x]
-            nll_vals.append(-torch.log(prob + self.eps))
-
-        return torch.stack(nll_vals).mean()
+        return torch.stack(ngp_vals).mean() if ngp_vals else torch.tensor(0.0)
 
 
-class TopKCoverageMetric(CoordMetric):
+class DirectionalAccuracyMetric():
     """
-    Top-K Coverage.
-    Checks whether the GT final position falls within the top-k% 
-    of predicted probability mass.
+    Directional Accuracy (DA).
+    Cosine similarity between the predicted motion direction and the
+    ground truth motion direction, both computed from coordinate sequences.
+    GT direction: vector from first to last GT future coordinate.
+    Predicted direction: vector from the GT current position (last past coord)
+    to the predicted endpoint (argmax of heatmap).
+    Range: [-1, 1] where 1 = perfect alignment, -1 = opposite direction.
     Higher = better.
+    Cited: Similar directional evaluation used in:
+    Salzmann et al., "Trajectron++", ECCV 2020.
 
-    Rewards uncertain but correct predictions — a diffuse heatmap that 
-    covers the true location scores well, whereas a confident wrong 
-    prediction (e.g. Kalman on a turning pedestrian) scores 0.
+    Dummy definition:   "Did you predict the right direction?" Draws a vector from where the pedestrian is now to
+                        where you predicted they'll go. Draws another vector from where they are now to where 
+                        they actually went. Measures how aligned those two vectors are. 1.0 = perfect direction,
+                        0.0 = perpendicular, -1.0 = completely backwards.
 
-    This is where heatmap models structurally outperform point estimates.
     """
-    def __init__(self, k: float = 0.1):
+    def forward(self, pred, target, coords, past_coords):
         """
-        k: fraction of pixels considered (e.g. 0.1 = top 10% by probability mass)
-        """
-        super().__init__()
-        self.k = k
-
-    def forward(self, pred, target, coords):
-        """
-        coords: (B, future_steps, 2) — last entry is the final GT position
+        pred:        (B, 1, H, W)
+        coords:      (B, future_steps, 2) — future GT coordinates
+        past_coords: (B, past_steps, 2)   — past coordinates, last = current pos
         """
         B = pred.shape[0]
-        H = pred.shape[-2]
         W = pred.shape[-1]
-        covered = []
-
+        da_vals = []
         for i in range(B):
-            p = pred[i].squeeze().float()           # (H, W)
+            p = pred[i].squeeze().float()
 
-            # Normalize
-            p_norm = p / (p.sum() + 1e-8)
+            # Predicted direction: current pos → predicted endpoint
+            flat_idx = p.argmax()
+            pred_y = (flat_idx // W).float()
+            pred_x = (flat_idx  % W).float()
 
-            # Find threshold: top-k% of probability mass
-            flat = p_norm.flatten()
-            sorted_vals, _ = torch.sort(flat, descending=True)
-            cumsum = torch.cumsum(sorted_vals, dim=0)
-            # Number of pixels needed to accumulate k of total mass
-            n_pixels = (cumsum <= self.k).sum().item() + 1
-            threshold = sorted_vals[min(n_pixels, len(sorted_vals) - 1)]
+            curr_x = past_coords[i, -1, 0].float()
+            curr_y = past_coords[i, -1, 1].float()
 
-            # GT final position
-            gt_x = int(coords[i, -1, 0].item())
-            gt_y = int(coords[i, -1, 1].item())
-            gt_x = max(0, min(gt_x, W - 1))
-            gt_y = max(0, min(gt_y, H - 1))
+            pred_dir = torch.stack([pred_x - curr_x, pred_y - curr_y])
 
-            in_top_k = (p_norm[gt_y, gt_x] >= threshold).float()
-            covered.append(in_top_k)
+            # GT direction: first → last future coordinate
+            gt_start = coords[i, 0].float()
+            gt_end   = coords[i, -1].float()
+            gt_dir   = gt_end - gt_start
 
-        return torch.stack(covered).mean()
+            # Cosine similarity
+            norm_pred = pred_dir.norm() + 1e-8
+            norm_gt   = gt_dir.norm() + 1e-8
+            cosine    = (pred_dir * gt_dir).sum() / (norm_pred * norm_gt)
+            da_vals.append(cosine)
+
+        return torch.stack(da_vals).mean() if da_vals else torch.tensor(0.0)
+
+
+class PathLengthRatioMetric():
+    """
+    Path Length Ratio (PLR).
+    Ratio of predicted path length to GT path length.
+    Predicted length: Euclidean distance from current position
+    (last past coordinate) to predicted endpoint (argmax of heatmap).
+    GT length: total arc length of the future coordinate sequence.
+    PLR = predicted_length / gt_length
+    A value of 1.0 indicates perfect length match.
+    Values below 1.0 indicate underprediction (model predicts shorter
+    trajectories than ground truth — expected due to perspective
+    shortening in tilted-camera datasets and safe-blob collapse).
+    Higher = better, but used primarily as a diagnostic metric to
+    quantify the known length limitation of the model.
+    This is a custom metric designed to explicitly measure the
+    trajectory length limitation identified during experimentation.
+    No external citation — proposed in this work.
+
+    Dummy definition:   "How long is your prediction compared to reality?" GT pedestrian 
+                        walked 100 pixels worth of path. You predicted they'd move 40 pixels. PLR = 0.4. 
+                        This metric explicitly captures the known limitation — your model predicts shorter 
+                        trajectories than reality due to perspective and the safe-blob tendency. Expected to be below 1.0,
+                        and that's okay — it's there to be honest about the limitation, not to win.
+    """
+    def forward(self, pred, target, coords, past_coords):
+        """
+        pred:        (B, 1, H, W)
+        coords:      (B, future_steps, 2)
+        past_coords: (B, past_steps, 2)
+        """
+        B = pred.shape[0]
+        W = pred.shape[-1]
+        plr_vals = []
+        for i in range(B):
+            p = pred[i].squeeze().float()
+
+            # Predicted length: current pos → argmax
+            flat_idx = p.argmax()
+            pred_y = (flat_idx // W).float()
+            pred_x = (flat_idx  % W).float()
+
+            curr_x = past_coords[i, -1, 0].float()
+            curr_y = past_coords[i, -1, 1].float()
+
+            pred_len = torch.sqrt((pred_x - curr_x)**2 + (pred_y - curr_y)**2)
+
+            # GT length: arc length along future coords
+            gt = coords[i].float()  # (T, 2)
+            diffs = gt[1:] - gt[:-1]
+            gt_len = torch.sqrt((diffs**2).sum(dim=1)).sum()
+
+            if gt_len < 1e-3:
+                continue  # skip stationary pedestrians
+
+            plr_vals.append(pred_len / gt_len)
+
+        return torch.stack(plr_vals).mean() if plr_vals else torch.tensor(0.0)

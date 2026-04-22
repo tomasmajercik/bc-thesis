@@ -169,9 +169,8 @@ def rasterize_future_traj(traj, frame_id, future_steps, height, width, method):
         if not (0 <= px < width and 0 <= py < height):
             continue
 
-        sigma = 7.0 + 1.0 * (i / max(1, n - 1))          # later → wider (old)
-        # sigma = 12.0 + 5.0 * (i / max(1, n - 1)) # 🚨 experiment with wider
-        amp   = np.exp(-0.25 * i / max(1, n - 1))
+        sigma = 5 + 4.0 * (i / max(1, n - 1))
+        amp   = np.exp(-1.5 * i / max(1, n - 1))
 
         ksize = int(6 * sigma + 1) | 1
 
@@ -181,7 +180,7 @@ def rasterize_future_traj(traj, frame_id, future_steps, height, width, method):
 
         heatmap += tmp
 
-    heatmap = cv2.GaussianBlur(heatmap, (0, 0), sigmaX=3.0) # type: ignore
+    heatmap = cv2.GaussianBlur(heatmap, (0, 0), sigmaX=2.0) # type: ignore
 
     # --- normalize to [0,255] ---
     heatmap /= (heatmap.max() + 1e-8)

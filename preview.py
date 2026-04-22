@@ -49,6 +49,7 @@ def _load_dataset(CFG, dataset_name):
 
 def preview(
     checkpoint_name: str,
+    epoch: int,
     dataset_name: str,
     num_images: int = 30,
     config_path: str = "training/config/training_cfg.yaml",
@@ -80,7 +81,10 @@ def preview(
         use_motion          = use_motion,
     ).to(DEVICE)
 
-    ckpt_path = Path("checkpoints") / checkpoint_name / "best_model.pth"
+    if epoch is None:
+        ckpt_path = Path("checkpoints") / checkpoint_name / "best_model.pth"
+    else:
+        ckpt_path = Path("checkpoints") / checkpoint_name / f"[{epoch}]_epoch.pth"
     ckpt = torch.load(ckpt_path, map_location=DEVICE)
     state = ckpt["model_state_dict"] if "model_state_dict" in ckpt else ckpt
     model.load_state_dict(state)
@@ -133,4 +137,6 @@ def preview(
 
 
 if __name__ == "__main__":
-    preview("pets-balanced", dataset_name="pets", num_images=30)
+    # preview("pets-balanced2", epoch=16, dataset_name="pets", num_images=30) # 5-7-*8*-16
+    # preview("rouen-balanced2", epoch=19, dataset_name="rouen", num_images=30) # 8-*19*
+    preview("stmarc-balanced", epoch=12, dataset_name="stmarc", num_images=30) # *12*

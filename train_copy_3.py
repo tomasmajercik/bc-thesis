@@ -15,7 +15,7 @@ if __name__ == "__main__":
     # CFG    = load_params("training/config/pets-training.yaml")
     # CFG    = load_params("training/config/stmarc-training.yaml")
     # CFG    = load_params("training/config/sherbrooke-training.yaml")
-    CFG    = load_params("training/config/rouen-training1.yaml")
+    CFG    = load_params("training/config/rouen-training3.yaml")
     # CFG    = load_params("training/config/atrium-training.yaml")
     # CFG    = load_params("training/config/mots16_02-training.yaml")
     logger = WandbLogger(CFG)
@@ -48,7 +48,7 @@ if __name__ == "__main__":
     test_loader  = DataLoader(test_ds,  batch_size=CFG['batch_size'], shuffle=False)
 
     ## Load model
-    from model.noimp_model import MultiEncoderUNet
+    from model.nozoom_model import MultiEncoderUNet
     model = MultiEncoderUNet().to(DEVICE)
 
     from training.losses import TverskyLoss
@@ -88,7 +88,7 @@ if __name__ == "__main__":
                 model_out = model(past, imp, ctx, zoom, past_coords)
             else:
                 past, imp, ctx, zoom, target, _ = [x.to(DEVICE) for x in batch]
-                model_out = model(past,  ctx, zoom)
+                model_out = model(past,imp, ctx)
 
             optimizer.zero_grad()
             loss = criterion(model_out, target.float())
@@ -112,7 +112,7 @@ if __name__ == "__main__":
                     model_out = model(past, imp, ctx, zoom, past_coords)
                 else:
                     past, imp, ctx, zoom, target, coords = [x.to(DEVICE) for x in batch]
-                    model_out = model(past,  ctx, zoom)
+                    model_out = model(past,imp, ctx)
                 loss = criterion(model_out, target.float())
 
                 val_loss += loss.item()
@@ -187,7 +187,7 @@ if __name__ == "__main__":
                 model_out = model(past, imp, ctx, zoom, past_coords)
             else:
                 past, imp, ctx, zoom, target, coords = [x.to(DEVICE) for x in batch]
-                model_out = model(past,  ctx, zoom)
+                model_out = model(past,imp, ctx)
             loss = criterion(model_out, target.float())
 
             test_loss += loss.item()

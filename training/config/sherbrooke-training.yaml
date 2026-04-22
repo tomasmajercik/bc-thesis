@@ -28,7 +28,7 @@ dataset: "sherbrooke" # pets (LT), stmarc, sherbrooke, atrium, rouen, mots16_02
 wandb:
   use_wandb: true
   project: "bc-thesis"
-  run_name: "sherbrooke-balanced"
+  run_name: "sherbrooke-balanced2"
   log_interval: 1 # every N epoch
   group: "wrapping-up" 
 

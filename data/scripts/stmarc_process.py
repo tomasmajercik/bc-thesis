@@ -172,8 +172,8 @@ def rasterize_future_traj(traj, frame_id, future_steps, height, width, method):
         if not (0 <= px < width and 0 <= py < height):
             continue
 
-        sigma = 10.0 + 3.0 * (i / max(1, n - 1))
-        amp   = np.exp(-0.5 * i / max(1, n - 1))
+        sigma = 5 + 4.0 * (i / max(1, n - 1))
+        amp   = np.exp(-1.5 * i / max(1, n - 1))
         ksize = int(6 * sigma + 1) | 1
 
         tmp = np.zeros((height, width), dtype=np.float32)
