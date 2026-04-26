@@ -33,10 +33,10 @@ class MultiEncoderUNet(nn.Module):
         self.use_motion = use_motion
 
         # ---------- Encoders ----------
-        self.past_enc   = PastTrajectoryEncoder(past_channels,     width=width)
-        self.impass_enc = ObstacleEncoder(obstacle_channels,       width=width)
-        self.ctx_enc    = ContextEncoder(context_channels,         width=width)
-        self.zoom_enc   = ZoomEncoder(zoom_channels,               width=width)
+        self.past_enc   = PastTrajectoryEncoder(past_channels,     width=width) # 3 levels 
+        self.impass_enc = ObstacleEncoder(obstacle_channels,       width=width) # 3 levels
+        self.ctx_enc    = ContextEncoder(context_channels,         width=width) # 4 levels
+        self.zoom_enc   = ZoomEncoder(zoom_channels,               width=width) # 4 levels
 
         if use_motion:
             self.motion_block = PastMotionBlock(hidden_size=lstm_hidden)

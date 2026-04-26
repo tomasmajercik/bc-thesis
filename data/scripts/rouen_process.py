@@ -326,12 +326,24 @@ if __name__ == "__main__":
             gt_file = gt_dir / f"{iterator:04d}.npy"
             np.save(gt_file, future_heatmaps[pid])
 
+            frames_list = [f for (f, _, _) in trajectories[pid]]
+            idx = frames_list.index(frame_id)
+
+            ## save target coords for evaluation
             coords_dir = Path(f"../processed/{save_name}/target_coords")
             coords_dir.mkdir(parents=True, exist_ok=True)
-
-            future_coords = [(x, y) for (f, x, y) in trajectories[pid] if frame_id < f <= frame_id + future_steps]
-
+            future_coords = [(x, y) for (_, x, y) in trajectories[pid][idx + 1 : idx + 1 + future_steps]]
             np.save(coords_dir / f"{iterator:04d}.npy", np.array(future_coords, dtype=np.float32))
+
+            ## save past coords for LSTM encoder
+            past_coords_dir = Path(f"../processed/{save_name}/past_coords")
+            past_coords_dir.mkdir(parents=True, exist_ok=True)
+            start = max(0, idx - past_steps + 1)
+            past_xy = [(x, y) for (_, x, y) in trajectories[pid][start : idx + 1]]
+            if len(past_xy) < past_steps:
+                pad = [past_xy[0]] * (past_steps - len(past_xy))
+                past_xy = pad + past_xy
+            np.save(past_coords_dir / f"{iterator:04d}.npy", np.array(past_xy, dtype=np.float32))
 
             iterator += 1
 
