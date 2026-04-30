@@ -1,0 +1,11 @@
+# sherbrooke dataset preprocessing parameters
+for_input:
+  local_scale: 3.0 
+  context_scale: 1.5 
+  traj_sampling_method: "linear" 
+  past_traj_steps: 50
+
+for_groundtruth:
+  save_as: "Sherbrooke-Balanced"
+  future_traj_steps: 50           
+  traj_sampling_method: "gaussian" 

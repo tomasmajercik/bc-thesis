@@ -6,10 +6,7 @@ from torch.utils.data import DataLoader
 
 from model.model import MultiEncoderUNet
 from training.utils import load_params, split_ds_sequential
-from training.datasets import (
-    PETSDataset, PETSDatasetLT, PETSDatasetST, PETSDatasetLW, PETSDatasetSW,
-    StMarcDataset, SherbrookeDataset, AtriumDataset, RouenDataset, MOTS16_02Dataset,
-)
+from training.datasets import PetsDataset, RouenDataset, AtriumDataset, SherbrookeDataset, StMarcDataset, MotDataset
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -25,32 +22,35 @@ def _overlay(ax, heatmap, color_rgb, label, alpha_scale=1.0):
     ax.imshow(rgba, interpolation='bilinear')
 
 
-def _load_dataset(CFG):
-    use_lstm = CFG.get('use_lstm', False)
+def _load_dataset(CFG, dataset_name):
+    use_motion = CFG.get('use_motion', False)
     kwargs = dict(
         scale=CFG['image_scale'],
         return_coords=True,
-        return_past_coords=use_lstm,
+        return_past_coords=use_motion,
     )
-    ds_name = CFG['dataset']
+    ds_name = dataset_name
     if ds_name == "pets":
-        return PETSDatasetST(**kwargs)
+        # return PetsDataset(**kwargs) #type: ignore
+        return PetsDataset(**kwargs) #type: ignore
     elif ds_name == "stmarc":
-        return StMarcDataset(**kwargs)
+        return StMarcDataset(**kwargs) #type: ignore
     elif ds_name == "sherbrooke":
-        return SherbrookeDataset(**kwargs)
+        return SherbrookeDataset(**kwargs) #type: ignore
     elif ds_name == "atrium":
-        return AtriumDataset(**kwargs)
+        return AtriumDataset(**kwargs) #type: ignore
     elif ds_name == "rouen":
-        return RouenDataset(**kwargs)
+        return RouenDataset(**kwargs) #type: ignore
     elif ds_name == "mots16_02":
-        return MOTS16_02Dataset(scale=(CFG['image_scale'] - 0.15), return_coords=True, return_past_coords=use_lstm)
+        return MotDataset(scale=(CFG['image_scale'] - 0.15), return_coords=True, return_past_coords=use_motion)
     else:
         raise ValueError(f"Unknown dataset: {ds_name!r}")
 
 
 def preview(
     checkpoint_name: str,
+    epoch: int,
+    dataset_name: str,
     num_images: int = 30,
     config_path: str = "training/config/training_cfg.yaml",
 ):
@@ -64,10 +64,10 @@ def preview(
       - Red   : model prediction
     """
     CFG      = load_params(config_path)
-    use_lstm = CFG.get('use_lstm', False)
+    use_motion = CFG.get('use_motion', False)
 
     # ── Dataset ──────────────────────────────────────────────────────────────
-    dataset = _load_dataset(CFG)
+    dataset = _load_dataset(CFG, dataset_name)
     _, val_ds, _ = split_ds_sequential(dataset, CFG['train_ratio'], CFG['val_ratio'])
     val_loader   = DataLoader(val_ds, batch_size=1, shuffle=False)
 
@@ -78,10 +78,13 @@ def preview(
         context_channels  = 3,
         zoom_channels     = 3,
         width             = CFG['model_size'],
-        use_lstm          = use_lstm,
+        use_motion          = use_motion,
     ).to(DEVICE)
 
-    ckpt_path = Path("checkpoints") / checkpoint_name / "best_model.pth"
+    if epoch is None:
+        ckpt_path = Path("checkpoints") / checkpoint_name / "best_model.pth"
+    else:
+        ckpt_path = Path("checkpoints") / checkpoint_name / f"[{epoch}]_epoch.pth"
     ckpt = torch.load(ckpt_path, map_location=DEVICE)
     state = ckpt["model_state_dict"] if "model_state_dict" in ckpt else ckpt
     model.load_state_dict(state)
@@ -98,7 +101,7 @@ def preview(
             if saved >= num_images:
                 break
 
-            if use_lstm:
+            if use_motion:
                 past, imp, ctx, zoom, target, coords, past_coords = [x.to(DEVICE) for x in batch]
                 pred = model(past, imp, ctx, torch.zeros_like(zoom), past_coords)
             else:
@@ -134,4 +137,6 @@ def preview(
 
 
 if __name__ == "__main__":
-    preview("TverskyLossBalanced-ST", num_images=30)
+    # preview("pets-balanced2", epoch=16, dataset_name="pets", num_images=30) # 5-7-*8*-16
+    # preview("rouen-balanced2", epoch=19, dataset_name="rouen", num_images=30) # 8-*19*
+    preview("stmarc-balanced", epoch=12, dataset_name="stmarc", num_images=30) # *12*

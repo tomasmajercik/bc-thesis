@@ -10,14 +10,11 @@ image_scale: 0.5   # 1.0 = full, 0.5 = half size
 
 # Model
 model_size: 1 # 0.5 = small, 1 = base, 2 = large, etc.
-use_lstm: false # whether to use LSTM or not
+use_motion: false # whether to use motion features (LSTM encoder)
 
 # Loss fn
-nonzero_weight: 50.0
-sparsity_weight: 1.0
-# top_k_frac: 0.05 # for ChamferHeatmapLoss
-alpha: 0.3 # for TverskyLoss
-beta: 0.7  # for TverskyLoss
+alpha: 0.3 # for TverskyLossBalanced
+beta: 0.8  # for TverskyLossBalanced
 
 # Metrics
 return_coords: true
@@ -26,13 +23,13 @@ emd_weight: 20.0
 eps: 1e-8
 
 # Dataset
-dataset: "pets" # pets, stmarc, sherbrooke, atrium, rouen, mots16_02
+dataset: "pets" # pets (LT), stmarc, sherbrooke, atrium, rouen, mots16_02
 
 wandb:
   use_wandb: true
   project: "bc-thesis"
-  run_name: "TverskyLoss"
+  run_name: "pets-balanced2"
   log_interval: 1 # every N epoch
-  group: "length-thickness-experiments" 
+  group: "wrapping-up" 
 
 debug: false

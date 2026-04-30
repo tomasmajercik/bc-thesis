@@ -90,7 +90,7 @@ def rasterize_past_traj(
     height,
     width,
     traj_method,
-    radius=2,
+    radius=5,
     min_intensity=50,
     max_intensity=255,
 ):
@@ -139,7 +139,20 @@ def rasterize_past_traj(
 
 def rasterize_future_traj(traj, frame_id, future_steps, height, width, method):
     if method != "gaussian":
-        raise NotImplementedError
+        heatmap = np.zeros((height, width), dtype=np.uint8)
+        frames = [f for (f, _, _) in traj]
+        if frame_id not in frames:
+            return None
+        future = [(f, x, y) for (f, x, y) in traj if frame_id < f <= frame_id + future_steps]
+        if len(future) == 0:
+            return None
+        pts = [(int(round(x)), int(round(y))) for (_, x, y) in future]
+        for i in range(len(pts) - 1):
+            cv2.line(heatmap, pts[i], pts[i + 1], color=255, thickness=10)
+        # mark the last point too (single-point future)
+        if len(pts) == 1:
+            cv2.circle(heatmap, pts[0], radius=5, color=255, thickness=-1)
+        return heatmap
 
     heatmap = np.zeros((height, width), dtype=np.float32)
 
@@ -159,7 +172,7 @@ def rasterize_future_traj(traj, frame_id, future_steps, height, width, method):
         if not (0 <= px < width and 0 <= py < height):
             continue
 
-        sigma = 2.0 + 3.0 * (i / max(1, n - 1))
+        sigma = 5 + 4.0 * (i / max(1, n - 1))
         amp   = np.exp(-1.5 * i / max(1, n - 1))
         ksize = int(6 * sigma + 1) | 1
 
@@ -168,7 +181,7 @@ def rasterize_future_traj(traj, frame_id, future_steps, height, width, method):
         tmp = cv2.GaussianBlur(tmp, (ksize, ksize), sigmaX=sigma)
         heatmap += tmp
 
-    heatmap = cv2.GaussianBlur(heatmap, (0, 0), sigmaX=1.0) # type: ignore
+    heatmap = cv2.GaussianBlur(heatmap, (0, 0), sigmaX=2.0) # type: ignore
     heatmap /= (heatmap.max() + 1e-8)
     heatmap = (heatmap * 255).astype(np.uint8)
 
@@ -206,8 +219,9 @@ def zoom_n_crop(frame, anchor_point, scale):
 
 
 if __name__ == "__main__":
-    INPUT_CFG, GT_CFG = load_params("configs/params.yaml")
+    INPUT_CFG, GT_CFG = load_params("configs/params-stmarc.yaml")
 
+    save_name   = GT_CFG.get("save_as", "Stmarc")
     frames_dir  = Path("../raw/stmarc/frames")
     db_path     = Path("../raw/stmarc/labels/stmarc_gt_pedestrians.sqlite")
     mask_path   = Path("../raw/stmarc/masks/obstacle_mask.png")
@@ -226,6 +240,7 @@ if __name__ == "__main__":
     frame_ids = sorted([
         int(p.stem)
         for p in frames_dir.glob("*.jpg")
+        # for p in frames_dir.glob("00001500.jpg") # DEBUG
     ])
 
     trajectories = load_past_traj(db_path)
@@ -264,7 +279,7 @@ if __name__ == "__main__":
                 height=H,
                 width=W,
                 traj_method=traj_method,
-                radius=2,
+                radius=5,
             )
 
             if raster is None:
@@ -301,8 +316,8 @@ if __name__ == "__main__":
         # compose and save
         # ==========================================================
         for pid in future_heatmaps.keys():
-            save_file = Path(f"../processed/stmarc/input/{iterator:04d}.npy")
-            gt_dir    = Path("../processed/stmarc/target"); gt_dir.mkdir(parents=True, exist_ok=True)
+            save_file = Path(f"../processed/{save_name}/input/{iterator:04d}.npy")
+            gt_dir    = Path(f"../processed/{save_name}/target"); gt_dir.mkdir(parents=True, exist_ok=True)
 
             compose(
                 traj_raster = traj_rasters[pid],
@@ -314,18 +329,28 @@ if __name__ == "__main__":
             gt_file = gt_dir / f"{iterator:04d}.npy"
             np.save(gt_file, future_heatmaps[pid])
 
-            coords_dir = Path("../processed/stmarc/target_coords")
+            frames_list = [f for (f, _, _) in trajectories[pid]]
+            idx = frames_list.index(frame_id)
+
+            ## save target coords for evaluation
+            coords_dir = Path(f"../processed/{save_name}/target_coords")
             coords_dir.mkdir(parents=True, exist_ok=True)
-
-            frames_list  = [f for (f, _, _) in trajectories[pid]]
-            idx          = frames_list.index(frame_id)
             future_coords = [(x, y) for (_, x, y) in trajectories[pid][idx + 1 : idx + 1 + future_steps]]
-
             np.save(coords_dir / f"{iterator:04d}.npy", np.array(future_coords, dtype=np.float32))
+
+            ## save past coords for LSTM encoder
+            past_coords_dir = Path(f"../processed/{save_name}/past_coords")
+            past_coords_dir.mkdir(parents=True, exist_ok=True)
+            start = max(0, idx - past_steps + 1)
+            past_xy = [(x, y) for (_, x, y) in trajectories[pid][start : idx + 1]]
+            if len(past_xy) < past_steps:
+                pad = [past_xy[0]] * (past_steps - len(past_xy))
+                past_xy = pad + past_xy
+            np.save(past_coords_dir / f"{iterator:04d}.npy", np.array(past_xy, dtype=np.float32))
 
             iterator += 1
 
-    obstacle_mask_file = Path("../processed/stmarc/obstacle_mask.npy")
+    obstacle_mask_file = Path(f"../processed/{save_name}/obstacle_mask.npy")
     obstacle_mask = obstacle_mask[..., None]   # (H, W, 1)
     np.save(obstacle_mask_file, obstacle_mask)
 

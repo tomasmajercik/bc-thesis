@@ -4,38 +4,39 @@ import torch.optim as optim
 from training.logger import WandbLogger
 from torch.utils.data import DataLoader
 from model.model import MultiEncoderUNet
-from training.metrics import EMDMetric, KLDMetric, FDEMetric, MRMetric
-from training.datasets import PETSDataset, PETSDatasetST, StMarcDataset, SherbrookeDataset, AtriumDataset, RouenDataset, MOTS16_02Dataset
-from training.losses import DiceLoss, NonZeroDiceLoss, SparseIoULoss, SparseHeatmapLoss
-from training.utils import ConsoleColors as cc, load_params, split_ds, split_ds_w_test, split_ds_sequential, log_predictions_to_wandb
+from training.utils import ConsoleColors as cc, load_params, split_ds_sequential, log_predictions_to_wandb
+from training.datasets import PetsDataset, RouenDataset, AtriumDataset, SherbrookeDataset, StMarcDataset, MotDataset
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 if __name__ == "__main__":
     ## Config ##
-    CFG    = load_params("training/config/training_cfg.yaml")
+    # CFG    = load_params("training/config/pets-training.yaml")
+    # CFG    = load_params("training/config/stmarc-training.yaml")
+    # CFG    = load_params("training/config/sherbrooke-training.yaml")
+    CFG    = load_params("training/config/rouen-training.yaml")
+    # CFG    = load_params("training/config/atrium-training.yaml")
+    # CFG    = load_params("training/config/mots16_02-training.yaml")
     logger = WandbLogger(CFG)
 
     if DEVICE == "cpu": print(cc.WARN + f"Using cpu as a device\n")
     else: print(cc.INFO + f"Using gpu as a device\n")
 
     ## Load dataset
-    use_lstm = CFG.get('use_lstm', False)
+    use_motion = CFG.get('use_motion', False)
 
     if CFG['dataset'] == "pets":
-        # dataset = PETSDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
-        from training.datasets import PETSDatasetLW
-        dataset = PETSDatasetLW(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
+        dataset = PetsDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_motion)
     elif CFG['dataset'] == "stmarc":
-        dataset = StMarcDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
+        dataset = StMarcDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_motion)
     elif CFG['dataset'] == "sherbrooke":
-        dataset = SherbrookeDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
+        dataset = SherbrookeDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_motion)
     elif CFG['dataset'] == "atrium":
-        dataset = AtriumDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
+        dataset = AtriumDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_motion)
     elif CFG['dataset'] == "rouen":
-        dataset = RouenDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_lstm)
+        dataset = RouenDataset(scale=CFG['image_scale'], return_coords=CFG['return_coords'], return_past_coords=use_motion)
     elif CFG['dataset'] == "mots16_02":
-        dataset = MOTS16_02Dataset(scale=(CFG['image_scale'] - 0.15), return_coords=CFG['return_coords'], return_past_coords=use_lstm)
+        dataset = MotDataset(scale=(CFG['image_scale'] - 0.15), return_coords=CFG['return_coords'], return_past_coords=use_motion)
 
     if CFG['debug']: dataset = torch.utils.data.Subset(dataset, range(20))
 
@@ -46,30 +47,20 @@ if __name__ == "__main__":
     test_loader  = DataLoader(test_ds,  batch_size=CFG['batch_size'], shuffle=False)
 
     ## Load model
-    model = MultiEncoderUNet(
-        past_channels     = 1,
-        obstacle_channels = 1,
-        context_channels  = 3,
-        zoom_channels     = 3,
-        width             = CFG['model_size'],
-        use_lstm          = use_lstm,
-    ).to(DEVICE)
+    # model = MultiEncoderUNet(
+    #     past_channels     = 1,
+    #     obstacle_channels = 1,
+    #     context_channels  = 3,
+    #     zoom_channels     = 3,
+    #     width             = CFG['model_size'],
+    #     use_motion        = use_motion,
+    # ).to(DEVICE)
+    from model.nopast_model import MultiEncoderUNet
+    model = MultiEncoderUNet().to(DEVICE)
+
 
     from training.losses import TverskyLoss
     criterion = TverskyLoss(alpha=CFG['alpha'], beta=CFG['beta']).to(DEVICE)
-    # from training.losses import ChamferHeatmapLoss
-    # criterion = ChamferHeatmapLoss(top_k_frac=CFG['top_k_frac']).to(DEVICE)
-    # from training.losses import RecallWithToleranceLoss
-    # criterion = RecallWithToleranceLoss(
-    #     tolerance_px=10,
-    #     recall_weight=15.0,
-    #     precision_weight=0.3,
-    # ).to(DEVICE)
-
-    # fourier = FourierLoss().to(DEVICE)
-    # edge    = EdgeLoss().to(DEVICE)
-    # sparse   = SparseHeatmapLoss().to(DEVICE)
-    # emd     = EMDLoss().to(DEVICE)
 
     optimizer = optim.Adam(model.parameters(), lr=float(CFG['learning_rate']), weight_decay=float(CFG['weight_decay']))
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -79,12 +70,6 @@ if __name__ == "__main__":
         patience=3,
         min_lr=1e-6
     )
-
-    ## Metrics
-    emd_metric = EMDMetric()
-    kld_metric = KLDMetric()
-    fde_metric = FDEMetric()
-    mr_metric  = MRMetric()
 
     ## Fixed viz batch — grab the middle batch of val so it's always the same samples
     all_val_batches  = list(val_loader)
@@ -102,12 +87,12 @@ if __name__ == "__main__":
         train_loss = 0
 
         for batch in train_loader:
-            if use_lstm:
+            if use_motion:
                 past, imp, ctx, zoom, target, _, past_coords = [x.to(DEVICE) for x in batch]
-                model_out = model(past, imp, ctx, torch.zeros_like(zoom), past_coords)
+                model_out = model(past, imp, ctx, zoom, past_coords)
             else:
                 past, imp, ctx, zoom, target, _ = [x.to(DEVICE) for x in batch]
-                model_out = model(past, imp, ctx, torch.zeros_like(zoom))
+                model_out = model(torch.zeros_like(past), imp, ctx, zoom)
 
             optimizer.zero_grad()
             loss = criterion(model_out, target.float())
@@ -126,19 +111,15 @@ if __name__ == "__main__":
 
         with torch.no_grad():
             for batch in val_loader:
-                if use_lstm:
+                if use_motion:
                     past, imp, ctx, zoom, target, coords, past_coords = [x.to(DEVICE) for x in batch]
-                    model_out = model(past, imp, ctx, torch.zeros_like(zoom), past_coords)
+                    model_out = model(past, imp, ctx, zoom, past_coords)
                 else:
                     past, imp, ctx, zoom, target, coords = [x.to(DEVICE) for x in batch]
-                    model_out = model(past, imp, ctx, torch.zeros_like(zoom))
+                    model_out = model(torch.zeros_like(past), imp, ctx, zoom)
                 loss = criterion(model_out, target.float())
 
                 val_loss += loss.item()
-                val_emd  += emd_metric(model_out, target).item()
-                val_kld  += kld_metric(model_out, target).item()
-                val_fde  += fde_metric(model_out, target, coords).item()
-                val_mr   += mr_metric(model_out,  target, coords).item()
 
                 # edge_loss = edge(model_out, target.float()).item()
                 # fourier_loss = fourier(model_out, target.float()).item()
@@ -152,11 +133,6 @@ if __name__ == "__main__":
         val_fde  /= n
         val_mr   /= n
 
-        # print(cc.INFO + f"Component losses - Fourier: {fourier_loss:.4f}  Edge: {edge_loss:.4f}  Sparse: {sparse_loss:.4f}  EMD: {emd_loss:.4f}")
-
-
-
-        # print(f"sparse: {val_loss:.4f}  EMD: {val_emd:.4f}")
 
         scheduler.step(val_loss)
 
@@ -172,22 +148,25 @@ if __name__ == "__main__":
             "lr":          optimizer.param_groups[0]['lr'],
         }, epoch + 1)
 
-        # ---------------- SAVE BEST MODEL ----------------
+        # ---------------- SAVE CHECKPOINT EVERY EPOCH ----------------
+        run_checkpoint_dir = checkpoint_dir / f"{CFG['wandb']['run_name']}"
+        run_checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+        epoch_checkpoint_path = run_checkpoint_dir / f"[{epoch+1}]_epoch.pth"
+        torch.save({
+            'epoch':                epoch + 1,
+            'model_state_dict':     model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'train_loss':           train_loss,
+            'val_loss':             val_loss,
+            'config':               CFG,
+        }, epoch_checkpoint_path)
+
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            checkpoint_path = checkpoint_dir / f"{CFG['wandb']['run_name']}" / "best_model.pth"
-            checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+            print(cc.INFO + f"New best val loss: {val_loss:.4f} (epoch {epoch+1})")
 
-            torch.save({
-                'epoch':                epoch + 1,
-                'model_state_dict':     model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'train_loss':           train_loss,
-                'val_loss':             val_loss,
-                'config':               CFG,
-            }, checkpoint_path)
-
-            print(cc.INFO + f"New best model saved. Val loss: {val_loss:.4f} (epoch {epoch+1})")
+        print(cc.INFO + f"Checkpoint saved: {epoch_checkpoint_path}")
 
         print(cc.INFO + f"Epoch {epoch+1}/{CFG['num_epochs']}")
         print(cc.INFO + f"Train loss: {train_loss:.4f}")
@@ -197,7 +176,8 @@ if __name__ == "__main__":
     print(cc.INFO + "Running final test evaluation...")
 
     # ---------------- FINAL TEST EVALUATION ----------------
-    best_checkpoint_path = checkpoint_dir / f"{CFG['wandb']['run_name']}" / "best_model.pth"
+    run_checkpoint_dir = checkpoint_dir / f"{CFG['wandb']['run_name']}"
+    best_checkpoint_path = min(run_checkpoint_dir.glob("[*]_epoch.pth"), key=lambda p: torch.load(p, map_location='cpu')['val_loss'])
     checkpoint = torch.load(best_checkpoint_path, map_location=DEVICE)
     model.load_state_dict(checkpoint["model_state_dict"])
 
@@ -206,19 +186,15 @@ if __name__ == "__main__":
 
     with torch.no_grad():
         for batch in test_loader:
-            if use_lstm:
+            if use_motion:
                 past, imp, ctx, zoom, target, coords, past_coords = [x.to(DEVICE) for x in batch]
-                model_out = model(past, imp, ctx, torch.zeros_like(zoom), past_coords)
+                model_out = model(past, imp, ctx, zoom, past_coords)
             else:
                 past, imp, ctx, zoom, target, coords = [x.to(DEVICE) for x in batch]
-                model_out = model(past, imp, ctx, torch.zeros_like(zoom))
+                model_out = model(torch.zeros_like(past), imp, ctx, zoom)
             loss = criterion(model_out, target.float())
 
             test_loss += loss.item()
-            test_emd  += emd_metric(model_out, target).item()
-            test_kld  += kld_metric(model_out, target).item()
-            test_fde  += fde_metric(model_out, target, coords).item()
-            test_mr   += mr_metric(model_out,  target, coords).item()
 
     n = len(test_loader)
     test_loss /= n

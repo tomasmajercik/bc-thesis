@@ -108,7 +108,7 @@ class BaseDataset(torch.utils.data.Dataset):
 
         return past_coords
             
-class PETSDataset(BaseDataset):
+class PETSDatasetOld(BaseDataset):
     def __init__(self, root_dir="data/processed/PETS09", scale=0.5, return_coords=False, no_steps=21, return_past_coords=False):
         super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
 
@@ -132,35 +132,60 @@ class PETS09NoGaussL(BaseDataset):
 class PETS09NoGaussS(BaseDataset):
     def __init__(self, root_dir="data/processed/PETS09-NoGauss-S", scale=0.5, return_coords=False, no_steps=21, return_past_coords=False):
         super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
+class PETS09NoGauss5sec(BaseDataset):
+    def __init__(self, root_dir="data/processed/PETS09-NoGauss-5sec", scale=0.5, return_coords=False, no_steps=35, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
 ##############################################################################################################################
 class PETS09_Old(BaseDataset):
     def __init__(self, root_dir="data/processed/PETS09-Old", scale=0.5, return_coords=False, no_steps=15, return_past_coords=False):
         super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
 ##############################################################################################################################
 
-class StMarcDataset(BaseDataset):
+class StMarcDatasetOld(BaseDataset):
     def __init__(self, root_dir="data/processed/stmarc", scale=0.5, return_coords=False, return_past_coords=False):
         super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, return_past_coords=return_past_coords)
 
-class SherbrookeDataset(BaseDataset):
+class SherbrookeDatasetOld(BaseDataset):
     def __init__(self, root_dir="data/processed/sherbrooke", scale=0.5, return_coords=False, return_past_coords=False):
         super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, return_past_coords=return_past_coords)
 
-class AtriumDataset(BaseDataset):
+class AtriumDatasetOld(BaseDataset):
     def __init__(self, root_dir="data/processed/atrium", scale=0.5, return_coords=False, return_past_coords=False):
         super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, return_past_coords=return_past_coords)
 
-class RouenDataset(BaseDataset):
+class RouenDatasetOld(BaseDataset):
     def __init__(self, root_dir="data/processed/rouen", scale=0.5, return_coords=False, return_past_coords=False):
         super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, return_past_coords=return_past_coords)
 
-class MOTS16_02Dataset(BaseDataset):
+class MOTS16_02DatasetOld(BaseDataset):
     def __init__(self, root_dir="data/processed/MOT16_02", scale=0.35, return_coords=False, return_past_coords=False):
         super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, return_past_coords=return_past_coords)
+
+# final
+##############################################################################################################################
+class PetsDataset(BaseDataset):
+    def __init__(self, root_dir="data/processed/PETS09-Balanced", scale=0.5, return_coords=False, no_steps=35, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
+class RouenDataset(BaseDataset):
+    def __init__(self, root_dir="data/processed/Rouen-Balanced", scale=0.5, return_coords=False, no_steps=50, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
+class AtriumDataset(BaseDataset):
+    def __init__(self, root_dir="data/processed/Atrium-Balanced", scale=0.5, return_coords=False, no_steps=15, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
+class SherbrookeDataset(BaseDataset):
+    def __init__(self, root_dir="data/processed/Sherbrooke-Balanced", scale=0.5, return_coords=False, no_steps=50, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
+class StMarcDataset(BaseDataset):
+    def __init__(self, root_dir="data/processed/Stmarc-Balanced", scale=0.5, return_coords=False, no_steps=75, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
+class MotDataset(BaseDataset):
+    def __init__(self, root_dir="data/processed/Mot16-Balanced", scale=0.5, return_coords=False, no_steps=50, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
+##############################################################################################################################
  
 if __name__ == "__main__":
     print("--- PETSDataset ---")
-    pets = PETSDataset()
+    pets = PETSDatasetOld()
     out  = pets[0]
     print(f"  samples : {len(pets)}")
     print(f"  shapes  : { {('past','impass','ctx','zoom','target')[i]: out[i].shape for i in range(5)} }")
@@ -189,10 +214,10 @@ if __name__ == "__main__":
     print(f"  samples : {len(rouen)}")
     print(f"  shapes  : { {('past','impass','ctx','zoom','target')[i]: out[i].shape for i in range(5)} }")
 
-    print("--- MOTS16_02Dataset ---")
-    mots16_02 = MOTS16_02Dataset()
-    out        = mots16_02[0]
-    print(f"  samples : {len(mots16_02)}")
-    print(f"  shapes  : { {('past','impass','ctx','zoom','target')[i]: out[i].shape for i in range(5)} }")
+    # print("--- MOTS16_02Dataset ---")
+    # mots16_02 = MOTS16_02Dataset()
+    # out        = mots16_02[0]
+    # print(f"  samples : {len(mots16_02)}")
+    # print(f"  shapes  : { {('past','impass','ctx','zoom','target')[i]: out[i].shape for i in range(5)} }")
 
 # python -m training.datasets

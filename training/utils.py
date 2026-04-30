@@ -71,11 +71,17 @@ def log_predictions_to_wandb(model, val_loader, epoch, device, num_samples=3, fi
     past, imp, ctx, zoom, target = [x.to(device) for x in batch[:5]]
 
     with torch.no_grad():
-        if model.use_lstm:
+        inputs = []
+        if hasattr(model, 'past_enc'):   inputs.append(past)
+        if hasattr(model, 'impass_enc'): inputs.append(imp)
+        if hasattr(model, 'ctx_enc'):    inputs.append(ctx)
+        if hasattr(model, 'zoom_enc'):   inputs.append(torch.zeros_like(zoom))
+
+        if model.use_motion:
             past_coords = batch[6].to(device)
-            pred = model(past, imp, ctx, torch.zeros_like(zoom), past_coords)
+            pred = model(*inputs, past_coords)
         else:
-            pred = model(past, imp, ctx, torch.zeros_like(zoom))
+            pred = model(*inputs)
 
     images_to_log = []
     for i in range(min(num_samples, past.shape[0])):
