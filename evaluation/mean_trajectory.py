@@ -1,14 +1,3 @@
-"""
-mean_trajectory.py — Dataset mean trajectory baseline.
-
-Predicts the same per-timestep average future position for every pedestrian,
-computed from the training split. Represents "zero personalization": if your
-model can't beat this it has learned nothing about individual motion.
-
-Exports run_mean_trajectory() for use by evaluate.py in the project root.
-Can also be run standalone: python evaluation/mean_trajectory.py
-"""
-
 import sys
 import os
 

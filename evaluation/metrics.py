@@ -1,116 +1,6 @@
 """metrics.py"""
 import torch
 
-class PathCoverageMetric():
-    """
-    Path Coverage @ K (PC@K).
-    Fraction of GT future positions that are "covered" by the prediction —
-    i.e., the predicted heatmap has activation above `threshold` within
-    `radius_px` pixels of that GT position.
-
-    Measures how much of the future trajectory the model anticipated,
-    regardless of whether it predicted the exact endpoint.
-    Better suited for spatial blob predictions than point-accuracy metrics
-    like FDE or MR.
-
-    Range: [0, 1]. Higher = better.
-
-    Cited: Inspired by coverage evaluation in:
-    Mangalam et al., "It Is Not the Journey but the Destination", ECCV 2020.
-    Liang et al., "PECNet", ECCV 2020.
-
-    Dummy definition: "What fraction of the pedestrian's future path did
-    you anticipate?" If the pedestrian walks through 10 positions and your
-    prediction covers 7 of them, PC@K = 0.7. Kalman only covers positions
-    near its single predicted line; your blob covers the nearby region.
-    """
-    def __init__(self, radius_px: float = 20.0, threshold: float = 0.1):
-        self.radius_px = radius_px
-        self.threshold = threshold
-
-    def forward(self, pred, target, coords):
-        """
-        pred:   (B, 1, H, W) — model output in [0, 1]
-        target: (B, 1, H, W) — not used, kept for consistent interface
-        coords: (B, future_steps, 2) — GT future positions (x, y)
-        """
-        B = pred.shape[0]
-        H = pred.shape[2]
-        W = pred.shape[3]
-        coverage_vals = []
-
-        for i in range(B):
-            p = pred[i].squeeze().float()  # (H, W)
-
-            # precompute coordinate grids once
-            ys = torch.arange(H, device=p.device).float()
-            xs = torch.arange(W, device=p.device).float()
-            grid_y, grid_x = torch.meshgrid(ys, xs, indexing='ij')  # (H, W)
-
-            covered = 0
-            total = 0
-
-            for step in range(coords.shape[1]):
-                gt_x = coords[i, step, 0].float()
-                gt_y = coords[i, step, 1].float()
-
-                # skip padded invalid coords
-                if gt_x < 0 or gt_y < 0:
-                    continue
-
-                total += 1
-
-                # find max prediction within radius_px of this GT point
-                dist_map = torch.sqrt((grid_x - gt_x)**2 + (grid_y - gt_y)**2)
-                within_radius = dist_map <= self.radius_px
-                max_pred_nearby = p[within_radius].max() if within_radius.any() else torch.tensor(0.0)
-
-                if max_pred_nearby >= self.threshold:
-                    covered += 1
-
-            if total > 0:
-                coverage_vals.append(torch.tensor(covered / total))
-
-        return torch.stack(coverage_vals).mean() if coverage_vals else torch.tensor(0.0)
-    
-class FDEMetric():
-    """
-    Final Displacement Error (FDE).
-    Euclidean distance between the predicted endpoint (argmax of heatmap)
-    and the GT final position (last coordinate in coords).
-
-    Cited: Gupta et al., "Social GAN", CVPR 2018.
-    Gilles et al., "THOMAS", ICLR 2022 (heatmap-adapted FDE).
-
-    Dummy definition:  How far off is your predicted endpoint?" You predict where the pedestrian will end up. 
-                       GT says where they actually ended up. FDE measures the pixel distance between 
-                       those two points. Small = you found the right spot
-    """
-    def forward(self, pred, target, coords):
-        """
-        coords: (B, future_steps, 2) — last entry is the final GT position
-        """
-        B = pred.shape[0]
-        W = pred.shape[-1]
-        fde_vals = []
-
-        for i in range(B):
-            p = pred[i].squeeze().float()           # (H, W)
-
-            # Predicted endpoint: argmax of heatmap
-            flat_idx = p.argmax()
-            pred_y = (flat_idx // W).float()
-            pred_x = (flat_idx  % W).float()
-
-            # GT endpoint: last future coordinate
-            gt_x, gt_y = coords[i, -1, 0].float(), coords[i, -1, 1].float()
-
-            fde = torch.sqrt((pred_x - gt_x) ** 2 + (pred_y - gt_y) ** 2)
-            fde_vals.append(fde)
-
-        return torch.stack(fde_vals).mean()
-
-
 class MRMetric():
     """
     Miss Rate (MR).
@@ -331,3 +221,75 @@ class PathLengthRatioMetric():
             plr_vals.append(pred_len / gt_len)
 
         return torch.stack(plr_vals).mean() if plr_vals else torch.tensor(0.0)
+    
+class PathCoverageMetric():
+    """
+    Path Coverage @ K (PC@K).
+    Fraction of GT future positions that are "covered" by the prediction —
+    i.e., the predicted heatmap has activation above `threshold` within
+    `radius_px` pixels of that GT position.
+
+    Measures how much of the future trajectory the model anticipated,
+    regardless of whether it predicted the exact endpoint.
+    Better suited for spatial blob predictions than point-accuracy metrics
+    like FDE or MR.
+
+    Range: [0, 1]. Higher = better.
+
+    Cited: Inspired by coverage evaluation in:
+    Mangalam et al., "It Is Not the Journey but the Destination", ECCV 2020.
+    Liang et al., "PECNet", ECCV 2020.
+
+    Dummy definition: "What fraction of the pedestrian's future path did
+    you anticipate?" If the pedestrian walks through 10 positions and your
+    prediction covers 7 of them, PC@K = 0.7. Kalman only covers positions
+    near its single predicted line; your blob covers the nearby region.
+    """
+    def __init__(self, radius_px: float = 20.0, threshold: float = 0.1):
+        self.radius_px = radius_px
+        self.threshold = threshold
+
+    def forward(self, pred, target, coords):
+        """
+        pred:   (B, 1, H, W) — model output in [0, 1]
+        target: (B, 1, H, W) — not used, kept for consistent interface
+        coords: (B, future_steps, 2) — GT future positions (x, y)
+        """
+        B = pred.shape[0]
+        H = pred.shape[2]
+        W = pred.shape[3]
+        coverage_vals = []
+
+        for i in range(B):
+            p = pred[i].squeeze().float()  # (H, W)
+
+            # precompute coordinate grids once
+            ys = torch.arange(H, device=p.device).float()
+            xs = torch.arange(W, device=p.device).float()
+            grid_y, grid_x = torch.meshgrid(ys, xs, indexing='ij')  # (H, W)
+
+            covered = 0
+            total = 0
+
+            for step in range(coords.shape[1]):
+                gt_x = coords[i, step, 0].float()
+                gt_y = coords[i, step, 1].float()
+
+                # skip padded invalid coords
+                if gt_x < 0 or gt_y < 0:
+                    continue
+
+                total += 1
+
+                # find max prediction within radius_px of this GT point
+                dist_map = torch.sqrt((grid_x - gt_x)**2 + (grid_y - gt_y)**2)
+                within_radius = dist_map <= self.radius_px
+                max_pred_nearby = p[within_radius].max() if within_radius.any() else torch.tensor(0.0)
+
+                if max_pred_nearby >= self.threshold:
+                    covered += 1
+
+            if total > 0:
+                coverage_vals.append(torch.tensor(covered / total))
+
+        return torch.stack(coverage_vals).mean() if coverage_vals else torch.tensor(0.0)
