@@ -107,7 +107,7 @@ def coords_to_heatmap(coords: np.ndarray, H: int, W: int) -> torch.Tensor:
     for t, (x, y) in enumerate(coords):
         x = float(np.clip(x, 0, W - 1))
         y = float(np.clip(y, 0, H - 1))
-        sigma = 7.0 - 4.0 * (t / max(1, T - 1))
+        sigma = 7.0 - 4.0 * (t / max(1, T - 1)) 
         blob = np.exp(-((grid_x - x) ** 2 + (grid_y - y) ** 2) / (2.0 * sigma ** 2))
         heatmap += blob
 
@@ -147,7 +147,8 @@ def run_kalman(
 
             for b in range(B):
                 pc_np   = past_coords[b].numpy()
-                n_future = max(1, int(coords.shape[1] * 0.47))
+#                 n_future = max(1, int(coords.shape[1] * 0.47)) # <- for shorter kalman
+                n_future = coords.shape[1]                       # <- for full kalman
 
                 future_pred = predict_future(pc_np, n_future, proc_noise, obs_noise)
                 pred_hm = coords_to_heatmap(future_pred, H, W).unsqueeze(0)  # (1, 1, H, W)
@@ -155,6 +156,7 @@ def run_kalman(
                 gt_target  = target[b:b+1]        # (1, 1, H, W)
                 gt_coords  = coords[b:b+1]         # (1, steps, 2)
                 pc_tensor  = past_coords[b:b+1]    # (1, past_steps, 2)
+
                 accs["FDE"].append(fde_m.forward(pred_hm, gt_target, gt_coords).item())
                 accs["MR"].append(mr_m.forward(pred_hm, gt_target, gt_coords).item())
                 accs["NGP"].append(ngp_m.forward(pred_hm, gt_target, gt_coords).item())

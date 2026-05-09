@@ -25,6 +25,7 @@ from training.datasets import (
 )
 from training.utils import split_ds_sequential
 from evaluation.metrics import (
+    FDEMetric,
     MRMetric,
     NearestGTPixelMetric,
     DirectionalAccuracyMetric,
@@ -103,13 +104,14 @@ def run_linear(
     split_map = {"train": train_ds, "val": val_ds, "test": test_ds, "eval": ConcatDataset([val_ds, test_ds])}
     loader = DataLoader(split_map[split], batch_size=1, shuffle=False, num_workers=0)
 
+    fde_m = FDEMetric()
     mr_m  = MRMetric(threshold_px=20.0)
     ngp_m = NearestGTPixelMetric()
     da_m  = DirectionalAccuracyMetric()
     plr_m = PathLengthRatioMetric()
     pc_m  = PathCoverageMetric()
 
-    accs = {"MR": [], "NGP": [], "DA": [], "PLR": [], "PC": []}
+    accs = {"FDE": [], "MR": [], "NGP": [], "DA": [], "PLR": [], "PC": []}
 
     with torch.no_grad():
         for batch in loader:
@@ -127,6 +129,7 @@ def run_linear(
                 gt_coords = coords[b:b+1]
                 pc_tensor = past_coords[b:b+1]
 
+                accs["FDE"].append(fde_m.forward(pred_hm, gt_target, gt_coords).item())
                 accs["MR"].append(mr_m.forward(pred_hm, gt_target, gt_coords).item())
                 accs["NGP"].append(ngp_m.forward(pred_hm, gt_target, gt_coords).item())
                 accs["DA"].append(da_m.forward(pred_hm, gt_target, gt_coords, pc_tensor).item())
