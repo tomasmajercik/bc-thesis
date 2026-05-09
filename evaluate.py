@@ -148,8 +148,8 @@ def run_model(
 
 if __name__ == "__main__":
     start_time = time.time()
-    DATASET        = "pets"
-    # DATASET        = "rouen"
+    # DATASET        = "pets"
+    DATASET        = "rouen"
     # DATASET        = "stmarc"
     CHECKPOINT_RUN = "pets-balanced2"
     # CHECKPOINT_RUN = "rouen-balanced2"
@@ -166,24 +166,24 @@ if __name__ == "__main__":
     kalman_results = run_kalman(DATASET, SPLIT)
 
     print("\nRunning linear extrapolation baseline…")
-    linear_results = run_linear(DATASET, SPLIT)
+    # linear_results = run_linear(DATASET, SPLIT)
 
     print("\nRunning mean trajectory baseline…")
-    mean_results = run_mean_trajectory(DATASET, SPLIT)
+    # mean_results = run_mean_trajectory(DATASET, SPLIT)
 
     print("\nRunning model evaluation…")
-    model_results = run_model(DATASET, CHECKPOINT_RUN, SPLIT, epoch=EPOCH, batch_size=BATCH_SIZE)
+    # model_results = run_model(DATASET, CHECKPOINT_RUN, SPLIT, epoch=EPOCH, batch_size=BATCH_SIZE)
 
     output = {
         "higher_is_better": HIGHER_IS_BETTER,
         "kalman": kalman_results,
-        "linear_extrapolation": linear_results,
-        "mean_trajectory": mean_results,
-        "model":  model_results,
+        # "linear_extrapolation": linear_results,
+        # "mean_trajectory": mean_results,
+        # "model":  model_results,
     }
 
-    os.makedirs("evaluation/results", exist_ok=True)
-    out_path = f"evaluation/results/{CHECKPOINT_RUN}.json"
+    os.makedirs("evaluation/only-kalman-results", exist_ok=True)
+    out_path = f"evaluation/only-kalman-results/{CHECKPOINT_RUN}.json"
     with open(out_path, "w") as f:
         json.dump(output, f, indent=2)
 
