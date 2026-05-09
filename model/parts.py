@@ -1,6 +1,5 @@
 """
-parts.py
-Low-level UNet blocks (Conv, Down, Up...)
+parts.py - Low-level UNet blocks (Conv, Down, Up...)
 """
 import torch
 import torch.nn as nn

@@ -1,5 +1,5 @@
 """
-Decoder classes
+Decoder classes.
 """
 import torch
 import torch.nn as nn

@@ -1,3 +1,4 @@
+""" Visualizes how the multi-encoder UNet distributes attention weights across input modalities at each encoder level """
 import os
 import torch
 import numpy as np

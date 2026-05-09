@@ -1,5 +1,7 @@
 """
-Modality ablation study
+Runs a modality ablation study by zeroing out each input modality 
+(past, obstacle, context, zoom) and measuring the 
+impact on five evaluation metrics
 """
 import matplotlib
 import torch
@@ -12,15 +14,14 @@ import matplotlib.pyplot as plt
 from training.utils import split_ds
 from torch.utils.data import DataLoader
 from model.model import MultiEncoderUNet
-from training.datasets import PETSDataset
-# from training.losses import NonZeroDiceLoss, SparseHeatmapLoss, MAELoss
-from training.metrics import EMDMetric, KLDMetric, NSSMetric, FDEMetric, MRMetric
+from training.datasets import PetsDataset
+from evaluation.metrics import FDEMetric, MRMetric, PathCoverageMetric, DirectionalAccuracyMetric, PathLengthRatioMetric
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 def visualize_results(path):
     df = pd.read_csv(path)
 
-    metric_cols = ['emd', 'kld', 'nss', 'fde', 'mr']
+    metric_cols = ['fde', 'mr', 'da', 'pc', 'plr']
     group_cols  = ['past', 'obstacle', 'context', 'zoom']
 
     agg_df = df.groupby(group_cols)[metric_cols].mean().reset_index()
@@ -65,7 +66,7 @@ def visualize_results(path):
 #     df = df.groupby(['past', 'obstacle', 'context', 'zoom']).mean().reset_index()
 
 #     modalities  = ['past', 'obstacle', 'context', 'zoom']
-#     metric_cols = ['emd', 'kld', 'nss', 'fde', 'mr']
+#     metric_cols = ['fde', 'mr', 'da', 'pc', 'plr']
 #     colors      = ['#e74c3c', '#2ecc71']  # red=zeroed, green=kept
 
 #     fig, axes = plt.subplots(1, len(metric_cols), figsize=(22, 5))
@@ -95,7 +96,7 @@ def _plot_ablation_bars(csv_path):
     df = pd.read_csv(csv_path)
     df = df.groupby(['past', 'obstacle', 'context', 'zoom']).mean().reset_index()
 
-    metric_cols = ['emd', 'kld', 'nss', 'fde', 'mr']
+    metric_cols = ['fde', 'mr', 'da', 'pc', 'plr']
     modalities  = ['past', 'obstacle', 'context', 'zoom']
     colors      = ['#e05c5c', '#e0955c', '#5c8fe0', '#5cc47a']  # one color per modality
 
@@ -165,7 +166,7 @@ def _plot_ablation_heatmap(csv_path):
     df = pd.read_csv(csv_path)
     df = df.groupby(['past', 'obstacle', 'context', 'zoom']).mean().reset_index()
 
-    metric_cols = ['emd', 'kld', 'nss', 'fde', 'mr']
+    metric_cols = ['fde', 'mr', 'da', 'pc', 'plr']
     modalities  = ['past', 'obstacle', 'context', 'zoom']
 
     # --- Compute baseline (all modalities on) ---
@@ -320,7 +321,7 @@ if __name__ == "__main__":
     exit(0)
 
     batch_size = 8
-    dataset = PETSDataset(scale=0.5, return_coords=True)
+    dataset = PETSDataset(scale=0.5, return_coords=True, return_past_coords=True)
 
     train_ds, val_ds = split_ds(.01, dataset)
     train_loader = DataLoader(train_ds, batch_size, shuffle=True)
@@ -347,12 +348,14 @@ if __name__ == "__main__":
     #     'nonzero_dice': NonZeroDiceLoss(),
     #     'mae': MAELoss()
     # }
-    metrics = {
-        'emd':  EMDMetric(),
-        'kld':  KLDMetric(),
-        'nss':  NSSMetric(),
-        'fde':  FDEMetric(),
-        'mr':   MRMetric(threshold_px=20.0),  # tune this to your px/m ratio
+    metrics_std = {
+        'fde': FDEMetric(),
+        'mr':  MRMetric(threshold_px=20.0),
+        'pc':  PathCoverageMetric(),
+    }
+    metrics_past = {
+        'da':  DirectionalAccuracyMetric(),
+        'plr': PathLengthRatioMetric(),
     }
 
     results = []
@@ -361,7 +364,7 @@ if __name__ == "__main__":
     
     with torch.no_grad():
         for batch in tqdm(val_loader, desc="Samples"):
-            past, obstacle, context, zoom, target, coords = [x.to(DEVICE) for x in batch]
+            past, obstacle, context, zoom, target, coords, past_coords = [x.to(DEVICE) for x in batch]
 
             for combo in combinations:
                 past_inp     = past if combo[0] else torch.zeros_like(past)
@@ -374,7 +377,8 @@ if __name__ == "__main__":
                 # Compute all losses
                 # loss_values = {name: loss_fn(pred, target).item() for name, loss_fn in losses.items()}
                 # Compute all metrics
-                metric_values = {name: m(pred, target, coords).item() for name, m in metrics.items()}
+                metric_values = {name: m(pred, target, coords).item() for name, m in metrics_std.items()}
+                metric_values.update({name: m(pred, target, coords, past_coords).item() for name, m in metrics_past.items()})
 
                 results.append({
                     'past': combo[0],

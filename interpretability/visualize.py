@@ -1,3 +1,4 @@
+""" Provides utilities to visualize intermediate activations of the multi-encoder UNet"""
 import os
 import torch
 import numpy as np

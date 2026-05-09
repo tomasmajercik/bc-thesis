@@ -1,5 +1,5 @@
 """
-Fusion and Attention mechanisms
+Fusion and Attention mechanisms.
 """
 import torch
 import torch.nn as nn

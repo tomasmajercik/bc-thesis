@@ -1,4 +1,5 @@
-"""datasets.py"""
+"""datasets.py
+Dataset class for all tested datasets, including old versions and final versions. """
 import os
 import torch
 import numpy as np
@@ -172,11 +173,12 @@ class RouenDataset(BaseDataset):
 class AtriumDataset(BaseDataset):
     def __init__(self, root_dir="data/processed/Atrium-Balanced", scale=0.5, return_coords=False, no_steps=15, return_past_coords=False):
         super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
-class SherbrookeDataset(BaseDataset):
-    def __init__(self, root_dir="data/processed/Sherbrooke-Balanced", scale=0.5, return_coords=False, no_steps=50, return_past_coords=False):
-        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
 class StMarcDataset(BaseDataset):
     def __init__(self, root_dir="data/processed/Stmarc-Balanced", scale=0.5, return_coords=False, no_steps=75, return_past_coords=False):
+        super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
+# not included in final model training, but tested
+class SherbrookeDataset(BaseDataset):
+    def __init__(self, root_dir="data/processed/Sherbrooke-Balanced", scale=0.5, return_coords=False, no_steps=50, return_past_coords=False):
         super().__init__(root_dir=root_dir, scale=scale, return_coords=return_coords, no_steps=no_steps, return_past_coords=return_past_coords)
 class MotDataset(BaseDataset):
     def __init__(self, root_dir="data/processed/Mot16-Balanced", scale=0.5, return_coords=False, no_steps=50, return_past_coords=False):

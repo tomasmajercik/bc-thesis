@@ -1,0 +1,28 @@
+# Datasets
+This project uses three publicly available perspective-view surveillance datasets.
+Raw data must be downloaded manually and placed in the data/raw/ directory.
+
+## PETS09
+- Download: https://www.kaggle.com/datasets/yeeandres/pets2009 (accessed: April 2026)
+- Place in: data/raw/PETS09/
+
+## Urban Tracker (Rouen, St-Marc)
+- Download: http://www.jpjodoin.com/urbantracker/dataset.html (accessed: April 2026)
+- Place Rouen in:  data/raw/rouen/
+- Place St-Marc in: data/raw/stmarc/
+
+## Expected directory structure
+Each dataset directory should contain the following subdirectories:
+data/raw/<dataset>/
+    frames/   # Raw video frames
+    labels/   # Pedestrian annotations
+    masks/    # Manually created obstacle masks (one per scene)
+
+## Obstacle masks
+The obstacle mask for each scene must be created manually before preprocessing.
+It encodes walkable and impassable regions:
+    pixel value 1.0   = walkable
+    pixel value 0.5   = uncertain
+    pixel value 0.0   = impassable
+
+Place the mask in the corresponding data/raw/<dataset>/masks/ directory.

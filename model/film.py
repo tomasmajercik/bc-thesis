@@ -1,3 +1,6 @@
+""" Feature-wIse Linear Modulation (FiLM) implementation.
+It was only tested, but is not used in the final model.
+"""
 import torch
 import torch.nn as nn
 

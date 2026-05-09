@@ -1,3 +1,6 @@
+""" This script processes the St-Marc dataset. 
+run from `cd data/scripts` with `python stmarc_process.py`, make sure the raw data 
+is saved in the expected directory structure. The output will be saved to preprocessed/ folder. """
 import cv2
 import time
 import sqlite3

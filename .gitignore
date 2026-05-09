@@ -32,3 +32,14 @@ checkpoints/
 previews/
 evaluation/results/
 
+## these files were removed from the repository but are kept locally 
+# helper script for running more experiments in parallel
+run_ablations.sh 
+run_evals.sh
+
+# configs for unused datasets
+training/config/atrium-training.yaml
+training/config/mot16-training.yaml
+data/scripts/configs/params-atrium.yaml
+data/scripts/configs/params-mot16.yaml
+data/scripts/configs/params-sherbrooke.yaml

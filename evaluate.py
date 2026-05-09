@@ -1,4 +1,4 @@
-"""This evaluation script was written using Antropic's coding model"""
+"""This script for evaluation orchestration was written with help from Antropic's coding model"""
 import os
 import re
 import json
@@ -165,6 +165,9 @@ if __name__ == "__main__":
     print("Running Kalman baseline…")
     kalman_results = run_kalman(DATASET, SPLIT)
 
+    print("\nRunning model evaluation…")
+    model_results = run_model(DATASET, CHECKPOINT_RUN, SPLIT, epoch=EPOCH, batch_size=BATCH_SIZE)
+
     # not used in the final version
     # print("\nRunning linear extrapolation baseline…")
     # linear_results = run_linear(DATASET, SPLIT)
@@ -173,19 +176,16 @@ if __name__ == "__main__":
     # print("\nRunning mean trajectory baseline…")
     # mean_results = run_mean_trajectory(DATASET, SPLIT)
 
-    print("\nRunning model evaluation…")
-    model_results = run_model(DATASET, CHECKPOINT_RUN, SPLIT, epoch=EPOCH, batch_size=BATCH_SIZE)
-
     output = {
         "higher_is_better": HIGHER_IS_BETTER,
         "kalman": kalman_results,
+        "model":  model_results,
         # "linear_extrapolation": linear_results, # not used in the final version
         # "mean_trajectory": mean_results,        # not used in the final version
-        "model":  model_results,
     }
 
-    os.makedirs("evaluation/only-kalman-results", exist_ok=True)
-    out_path = f"evaluation/only-kalman-results/{CHECKPOINT_RUN}.json"
+    os.makedirs("evaluation/results", exist_ok=True)
+    out_path = f"evaluation/results/{CHECKPOINT_RUN}.json"
     with open(out_path, "w") as f:
         json.dump(output, f, indent=2)
 
