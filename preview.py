@@ -104,7 +104,7 @@ def preview(
             ctx_np  = ctx[0].permute(1, 2, 0).cpu().numpy()          # (H, W, 3)
             past_np = past[0, 0].cpu().numpy()                        # (H, W)
             gt_np   = target[0, 0].cpu().numpy()                      # (H, W)
-            pred_np = pred[0, 0].cpu().numpy()                        # (H, W) — model has Sigmoid inside OutConv
+            pred_np = pred[0, 0].cpu().numpy()                        # (H, W) - model has Sigmoid inside OutConv
 
             fig, ax = plt.subplots(figsize=(8, 6), tight_layout=True)
             ax.imshow(ctx_np)
@@ -119,7 +119,7 @@ def preview(
             ]
             ax.legend(handles=legend, loc="upper right", fontsize=8, framealpha=0.6)
             ax.axis('off')
-            ax.set_title(f"{checkpoint_name}  —  sample {saved}", fontsize=9)
+            ax.set_title(f"{checkpoint_name}  -  sample {saved}", fontsize=9)
 
             fig.savefig(out_dir / f"id{saved}.png", dpi=150, bbox_inches='tight')
             plt.close(fig)
@@ -144,9 +144,9 @@ def preview_with_kalman(
       Row 0 (top)    : model prediction
       Row 1 (bottom) : Kalman filter prediction
     Both rows share the same overlay scheme:
-      Blue  — past trajectory raster
-      Green — ground-truth future density
-      Red   — prediction (model or Kalman, respectively)
+      Blue  - past trajectory raster
+      Green - ground-truth future density
+      Red   - prediction (model or Kalman, respectively)
 
     Output: previews/model_io/model-kalman-comparison/<checkpoint_name>/id{i}.png
     Files are named by their actual sample index so ranges are comparable across runs.

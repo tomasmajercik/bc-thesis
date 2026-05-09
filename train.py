@@ -92,7 +92,7 @@ if __name__ == "__main__":
                 model_out = model(past, imp, ctx, zoom, past_coords)
             else:
                 past, imp, ctx, zoom, target, _ = [x.to(DEVICE) for x in batch]
-                model_out = model(torch.zeros_like(past), imp, ctx, zoom)
+                model_out = model(past, imp, ctx, zoom)
 
             optimizer.zero_grad()
             loss = criterion(model_out, target.float())
@@ -116,15 +116,10 @@ if __name__ == "__main__":
                     model_out = model(past, imp, ctx, zoom, past_coords)
                 else:
                     past, imp, ctx, zoom, target, coords = [x.to(DEVICE) for x in batch]
-                    model_out = model(torch.zeros_like(past), imp, ctx, zoom)
+                    model_out = model(past, imp, ctx, zoom)
                 loss = criterion(model_out, target.float())
 
                 val_loss += loss.item()
-
-                # edge_loss = edge(model_out, target.float()).item()
-                # fourier_loss = fourier(model_out, target.float()).item()
-                # sparse_loss = sparse(model_out, target.float()).item()
-                # emd_loss = emd(model_out, target.float()).item()
 
         n = len(val_loader)
         val_loss /= n
@@ -191,7 +186,7 @@ if __name__ == "__main__":
                 model_out = model(past, imp, ctx, zoom, past_coords)
             else:
                 past, imp, ctx, zoom, target, coords = [x.to(DEVICE) for x in batch]
-                model_out = model(torch.zeros_like(past), imp, ctx, zoom)
+                model_out = model(past, imp, ctx, zoom)
             loss = criterion(model_out, target.float())
 
             test_loss += loss.item()
