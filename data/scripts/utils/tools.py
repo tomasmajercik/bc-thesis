@@ -1,3 +1,5 @@
+""" This script contains the compose() function to merge the input modalities.
+It was also used to preview the generated inputs with decompose() function. """
 import cv2
 import yaml
 import numpy as np

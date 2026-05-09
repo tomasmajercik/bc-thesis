@@ -1,4 +1,6 @@
-"""past_motion_lstm_block.py"""
+""" Past motion LSTM block for processing past trajectory information.
+It was only tested, but is not used in the final model.
+"""
 
 import torch
 import torch.nn as nn

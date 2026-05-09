@@ -1,3 +1,5 @@
+""" This script generates visual previews of model predictions overlaid on the input context frames
+used for qualitative analysis. Written with help from Antropic's coding model. """
 import torch
 import numpy as np
 import matplotlib.pyplot as plt

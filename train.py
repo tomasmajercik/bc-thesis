@@ -1,3 +1,4 @@
+""" Main training script. Handles loading data, model, and training loop. """
 import torch
 from pathlib import Path
 import torch.optim as optim
@@ -47,18 +48,15 @@ if __name__ == "__main__":
     test_loader  = DataLoader(test_ds,  batch_size=CFG['batch_size'], shuffle=False)
 
     ## Load model
-    # model = MultiEncoderUNet(
-    #     past_channels     = 1,
-    #     obstacle_channels = 1,
-    #     context_channels  = 3,
-    #     zoom_channels     = 3,
-    #     width             = CFG['model_size'],
-    #     use_motion        = use_motion,
-    # ).to(DEVICE)
-    from model.nopast_model import MultiEncoderUNet
-    model = MultiEncoderUNet().to(DEVICE)
-
-
+    model = MultiEncoderUNet(
+        past_channels     = 1,
+        obstacle_channels = 1,
+        context_channels  = 3,
+        zoom_channels     = 3,
+        width             = CFG['model_size'],
+        use_motion        = use_motion,
+    ).to(DEVICE)
+    
     from training.losses import TverskyLoss
     criterion = TverskyLoss(alpha=CFG['alpha'], beta=CFG['beta']).to(DEVICE)
 
@@ -87,7 +85,7 @@ if __name__ == "__main__":
         train_loss = 0
 
         for batch in train_loader:
-            if use_motion:
+            if use_motion:   # if LSTM is used
                 past, imp, ctx, zoom, target, _, past_coords = [x.to(DEVICE) for x in batch]
                 model_out = model(past, imp, ctx, zoom, past_coords)
             else:
@@ -111,7 +109,7 @@ if __name__ == "__main__":
 
         with torch.no_grad():
             for batch in val_loader:
-                if use_motion:
+                if use_motion:   # if LSTM is used
                     past, imp, ctx, zoom, target, coords, past_coords = [x.to(DEVICE) for x in batch]
                     model_out = model(past, imp, ctx, zoom, past_coords)
                 else:
@@ -143,25 +141,22 @@ if __name__ == "__main__":
             "lr":          optimizer.param_groups[0]['lr'],
         }, epoch + 1)
 
-        # ---------------- SAVE CHECKPOINT EVERY EPOCH ----------------
+        # ---------------- SAVE CHECKPOINT ON IMPROVEMENT ----------------
         run_checkpoint_dir = checkpoint_dir / f"{CFG['wandb']['run_name']}"
         run_checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-        epoch_checkpoint_path = run_checkpoint_dir / f"[{epoch+1}]_epoch.pth"
-        torch.save({
-            'epoch':                epoch + 1,
-            'model_state_dict':     model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'train_loss':           train_loss,
-            'val_loss':             val_loss,
-            'config':               CFG,
-        }, epoch_checkpoint_path)
-
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            print(cc.INFO + f"New best val loss: {val_loss:.4f} (epoch {epoch+1})")
-
-        print(cc.INFO + f"Checkpoint saved: {epoch_checkpoint_path}")
+            best_checkpoint_path = run_checkpoint_dir / "best_model.pth"
+            torch.save({
+                'epoch':                epoch + 1,
+                'model_state_dict':     model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'train_loss':           train_loss,
+                'val_loss':             val_loss,
+                'config':               CFG,
+            }, best_checkpoint_path)
+            print(cc.INFO + f"New best val loss: {val_loss:.4f} (epoch {epoch+1}) — checkpoint saved")
 
         print(cc.INFO + f"Epoch {epoch+1}/{CFG['num_epochs']}")
         print(cc.INFO + f"Train loss: {train_loss:.4f}")
@@ -172,7 +167,7 @@ if __name__ == "__main__":
 
     # ---------------- FINAL TEST EVALUATION ----------------
     run_checkpoint_dir = checkpoint_dir / f"{CFG['wandb']['run_name']}"
-    best_checkpoint_path = min(run_checkpoint_dir.glob("[*]_epoch.pth"), key=lambda p: torch.load(p, map_location='cpu')['val_loss'])
+    best_checkpoint_path = run_checkpoint_dir / "best_model.pth"
     checkpoint = torch.load(best_checkpoint_path, map_location=DEVICE)
     model.load_state_dict(checkpoint["model_state_dict"])
 
@@ -181,7 +176,7 @@ if __name__ == "__main__":
 
     with torch.no_grad():
         for batch in test_loader:
-            if use_motion:
+            if use_motion:   # if LSTM is used
                 past, imp, ctx, zoom, target, coords, past_coords = [x.to(DEVICE) for x in batch]
                 model_out = model(past, imp, ctx, zoom, past_coords)
             else:

@@ -1,5 +1,5 @@
 """
-model.py  High-level model module.
+Modulated base model for ablation study without context encoder.
 """
 import torch
 import torch.nn as nn

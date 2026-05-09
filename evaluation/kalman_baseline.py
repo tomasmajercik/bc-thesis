@@ -2,7 +2,6 @@
 kalman_baseline.py — Constant-velocity Kalman filter baseline.
 
 Exports run_kalman() for use by evaluate.py in the project root.
-Can also be run standalone: python evaluation/kalman_baseline.py
 """
 
 import sys

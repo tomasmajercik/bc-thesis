@@ -1,3 +1,5 @@
+""" Script to run interpretability analysis on the trained model, visualizing activations from different layers of the encoders. """
+
 import torch
 from model.model import MultiEncoderUNet
 from training.datasets import PetsDataset

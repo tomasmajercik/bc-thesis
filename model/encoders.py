@@ -1,5 +1,5 @@
 """
-Encoder classes
+Encoder classes.
 """
 import torch.nn as nn
 from model.parts import DoubleConv, Down

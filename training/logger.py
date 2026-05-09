@@ -1,3 +1,4 @@
+""" Logger class for training, using wandb for experiment tracking. """
 import wandb
 from training.utils import ConsoleColors as cc
 

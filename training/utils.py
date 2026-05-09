@@ -1,3 +1,5 @@
+""" Utility functions for training, including config loading, dataset splitting, and Wandb logging. """
+
 import yaml
 import torch
 import wandb
@@ -130,10 +132,10 @@ def log_predictions_to_wandb(model, val_loader, epoch, device, num_samples=3, fi
 if __name__ == "__main__":
     from model.model import MultiEncoderUNet
     from torch.utils.data import DataLoader
-    from training.datasets import PETSDataset
+    from training.datasets import PetsDataset
 
     DEVICE      = "cuda" if torch.cuda.is_available() else "cpu"
-    dataset     = PETSDataset(scale=0.5)
+    dataset     = PetsDataset(scale=0.5)
     val_loader  = DataLoader(dataset, batch_size=1, shuffle=True)
 
     ## Load model

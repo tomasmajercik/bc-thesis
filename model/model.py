@@ -1,5 +1,5 @@
 """
-model.py  High-level model module.
+High-level model module. 
 """
 import torch
 import torch.nn as nn

@@ -1,3 +1,4 @@
+""" This script is not used, as this dataset was not used in the final thesis. """
 import cv2
 import time
 import sqlite3

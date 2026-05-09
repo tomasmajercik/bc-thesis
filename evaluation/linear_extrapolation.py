@@ -1,8 +1,8 @@
 """
-linear_extrapolation.py — Naive linear extrapolation baseline.
-
+linear_extrapolation.py — Linear extrapolation baseline.
 Exports run_linear() for use by evaluate.py in the project root.
-Can also be run standalone: python evaluation/linear_extrapolation.py
+
+Not used in the final thesis, but left here for future comparison.
 """
 
 import sys

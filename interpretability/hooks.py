@@ -1,3 +1,4 @@
+""" A context manager that attaches forward hooks to named model layers and captures their output activations for inspection """
 import torch.nn as nn
 
 class FeatureRecorder:

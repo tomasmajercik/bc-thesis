@@ -1,3 +1,4 @@
+"""Not used in the final thesis, but left here for future comparison."""
 import sys
 import os
 
@@ -68,16 +69,16 @@ def compute_mean_trajectory(train_loader) -> np.ndarray:
             for t in range(coords_np.shape[1]):
                 if coords_np[b, t, 0] >= 0:  # valid (not padding)
                     sum_coords[t] += coords_np[b, t]
-                    counts[t] += 1
+                    counts[t] += 1 # type: ignore
 
     if sum_coords is None:
         raise RuntimeError("Training loader was empty — cannot compute mean trajectory.")
 
     mean_traj = np.zeros_like(sum_coords)
     last_valid = None
-    for t in range(len(counts)):
-        if counts[t] > 0:
-            mean_traj[t] = sum_coords[t] / counts[t]
+    for t in range(len(counts)): # type: ignore
+        if counts[t] > 0: # type: ignore
+            mean_traj[t] = sum_coords[t] / counts[t] # type: ignore
             last_valid = mean_traj[t].copy()
         elif last_valid is not None:
             # carry forward if no training samples had this timestep
