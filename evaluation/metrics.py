@@ -1,6 +1,43 @@
 """metrics.py"""
 import torch
 
+class FDEMetric():
+    """
+    Final Displacement Error (FDE).
+    Euclidean distance between the predicted endpoint (argmax of heatmap)
+    and the GT final position (last coordinate in coords).
+
+    Cited: Gupta et al., "Social GAN", CVPR 2018.
+    Gilles et al., "THOMAS", ICLR 2022 (heatmap-adapted FDE).
+
+    Dummy definition:  How far off is your predicted endpoint?" You predict where the pedestrian will end up. 
+                       GT says where they actually ended up. FDE measures the pixel distance between 
+                       those two points. Small = you found the right spot
+    """
+    def forward(self, pred, target, coords):
+        """
+        coords: (B, future_steps, 2) — last entry is the final GT position
+        """
+        B = pred.shape[0]
+        W = pred.shape[-1]
+        fde_vals = []
+
+        for i in range(B):
+            p = pred[i].squeeze().float()           # (H, W)
+
+            # Predicted endpoint: argmax of heatmap
+            flat_idx = p.argmax()
+            pred_y = (flat_idx // W).float()
+            pred_x = (flat_idx  % W).float()
+
+            # GT endpoint: last future coordinate
+            gt_x, gt_y = coords[i, -1, 0].float(), coords[i, -1, 1].float()
+
+            fde = torch.sqrt((pred_x - gt_x) ** 2 + (pred_y - gt_y) ** 2)
+            fde_vals.append(fde)
+
+        return torch.stack(fde_vals).mean()
+    
 class MRMetric():
     """
     Miss Rate (MR).

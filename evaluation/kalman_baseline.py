@@ -107,7 +107,7 @@ def coords_to_heatmap(coords: np.ndarray, H: int, W: int) -> torch.Tensor:
     for t, (x, y) in enumerate(coords):
         x = float(np.clip(x, 0, W - 1))
         y = float(np.clip(y, 0, H - 1))
-        sigma = 5.0 + 4.0 * (t / max(1, T - 1))
+        sigma = 7.0 - 4.0 * (t / max(1, T - 1)) 
         blob = np.exp(-((grid_x - x) ** 2 + (grid_y - y) ** 2) / (2.0 * sigma ** 2))
         heatmap += blob
 
@@ -147,7 +147,8 @@ def run_kalman(
 
             for b in range(B):
                 pc_np   = past_coords[b].numpy()
-                n_future = coords.shape[1]
+#                 n_future = max(1, int(coords.shape[1] * 0.47)) # <- for shorter kalman
+                n_future = coords.shape[1]                       # <- for full kalman
 
                 future_pred = predict_future(pc_np, n_future, proc_noise, obs_noise)
                 pred_hm = coords_to_heatmap(future_pred, H, W).unsqueeze(0)  # (1, 1, H, W)

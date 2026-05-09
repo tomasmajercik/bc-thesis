@@ -1,6 +1,6 @@
 import torch
 from model.model import MultiEncoderUNet
-from training.datasets import PETSDataset
+from training.datasets import PetsDataset
 from torch.utils.data import DataLoader, Subset
 from interpretability.hooks import FeatureRecorder
 from interpretability.visualize import plot_activation_grid
@@ -8,7 +8,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"; BATCH_SIZE = 1
 
 # sample_indices = [i for i in range(1240,1260)] # up to 4630
 sample_indices = [1303] # up to 4630
-dataset = PETSDataset(scale=0.5)
+dataset = PetsDataset(scale=0.5)
 subset = Subset(dataset, sample_indices)
 samples = DataLoader(
     subset,
@@ -18,7 +18,7 @@ samples = DataLoader(
 )
 
 model = MultiEncoderUNet().to(DEVICE)
-ckpt_path = "checkpoints/long-strict-w-imgs/best_model.pth"
+ckpt_path = "checkpoints/pets-balanced2/[9]_epoch.pth"
 checkpoint = torch.load(ckpt_path, map_location=DEVICE)
 if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
     model.load_state_dict(checkpoint["state_dict"])
