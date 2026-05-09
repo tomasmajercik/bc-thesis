@@ -43,3 +43,5 @@ training/config/mot16-training.yaml
 data/scripts/configs/params-atrium.yaml
 data/scripts/configs/params-mot16.yaml
 data/scripts/configs/params-sherbrooke.yaml
+evaluation/linear_extrapolation.py
+evaluation/mean_trajectory.py
